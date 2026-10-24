@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LP vs Hold — honest Meteora LP report</title>
+<meta name="description" content="See whether providing liquidity on Meteora actually beat just holding your tokens.">
+<style>
+  :root { --bg: #0d1117; --panel: #161b22; --line: #30363d; --text: #e6edf3; --muted: #8b949e; --good: #3fb950; --bad: #f85149; --accent: #58a6ff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 48px 16px; }
+  h1 { font-size: 32px; line-height: 1.2; margin: 0 0 8px; }
+  .muted { color: var(--muted); }
+  form { display: flex; gap: 8px; margin: 24px 0 8px; }
+  input { flex: 1; min-width: 0; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font: inherit; }
+  button, .btn { padding: 12px 18px; border-radius: 8px; border: 0; background: var(--accent); color: #0d1117; font: 600 16px system-ui, sans-serif; cursor: pointer; text-decoration: none; display: inline-block; }
+  button:disabled { opacity: .6; cursor: wait; }
+  .btn.secondary { background: var(--panel); color: var(--text); border: 1px solid var(--line); }
+  #error { color: var(--bad); min-height: 24px; }
+  .hero { font-size: 64px; font-weight: 700; margin: 4px 0 16px; }
+  .good { color: var(--good); } .bad { color: var(--bad); }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+  .stat b { display: block; font-size: 22px; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; }
+  td:not(:first-child), th:not(:first-child) { text-align: right; white-space: nowrap; }
+  .tag { font-size: 12px; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0 4px; }
+  canvas { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--line); margin: 24px 0 12px; }
+  .share { display: flex; gap: 8px; flex-wrap: wrap; }
+  details { margin-top: 32px; color: var(--muted); }
+  footer { margin-top: 48px; font-size: 13px; color: var(--muted); }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Did your liquidity actually beat holding?</h1>
+  <p class="muted">Most LP dashboards show the fees you earned, not what price moves cost you. Paste a Solana wallet to see your Meteora DLMM results compared with simply holding the tokens you deposited.</p>
+
+  <form id="form">
+    <input id="wallet" placeholder="Solana wallet address" autocomplete="off" spellcheck="false" aria-label="Solana wallet address">
+    <button id="go">Check</button>
+  </form>
+  <div id="error" role="alert"></div>
+
+  <section id="result" hidden>
+    <p id="verdict"></p>
+    <div id="full">
+    <div id="hero" class="hero"></div>
+    <div class="stats">
+      <div class="stat"><span class="muted">Fees earned</span><b id="fees"></b></div>
+      <div class="stat"><span class="muted">Deposited</span><b id="deposited"></b></div>
+      <div class="stat"><span class="muted">PnL in dollars (Meteora)</span><b id="meteora"></b></div>
+      <div class="stat"><span class="muted">Pools</span><b id="pools"></b></div>
+    </div>
+    <p id="unpriced" class="muted" hidden></p>
+
+    <table>
+      <thead><tr><th>Pool</th><th>vs holding</th><th>Fees</th><th>Deposited</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p id="rows-note" class="muted"></p>
+
+    <canvas id="card" width="1200" height="630" aria-label="Shareable result card"></canvas>
+    <div class="share">
+      <a id="share-x" class="btn" target="_blank" rel="noopener">Share on X</a>
+      <button id="download" class="btn secondary" type="button">Download card</button>
+    </div>
+    </div>
+  </section>
+
+  <details>
+    <summary>How is this calculated?</summary>
+    <p>For every position we compare what you got back (withdrawals, plus what is still in the position if it is open) with the tokens you put in, and add the fees you earned. Closed positions are valued at the prices when you exited, so market moves after you left don't count. Open positions are valued at today's prices. Positive means LP left you with more than holding would have; negative means holding would have been better.</p>
+    <p>"PnL in dollars" is Meteora's own number: it compares with the dollar value at deposit time, so it also includes the market going up or down.</p>
+    <p>Covers pools where you closed a Meteora DLMM position in the last 365 days, plus pools with open positions. If a position was swapped entirely into one token, its exit price is estimated from the edge of its price range. Tokens without a current price count as $0. Read-only: we never ask you to connect a wallet.</p>
+  </details>
+
+  <footer>
+    Data from the public Meteora API. Not financial advice. Nothing is stored on our side. Not affiliated with Meteora. <a href="terms.html">Terms and privacy</a>
+  </footer>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>
