@@ -10,8 +10,18 @@
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, sans-serif; }
   main { max-width: 760px; margin: 0 auto; padding: 48px 16px; }
-  h1 { font-size: 32px; line-height: 1.2; margin: 0 0 8px; }
+  h1 { font-size: 36px; line-height: 1.2; margin: 0 0 16px; }
+  h2 { font-size: 22px; margin: 40px 0 8px; }
+  .eyebrow { color: var(--accent); font-weight: 600; margin: 0 0 8px; }
+  .lead { font-size: 18px; color: var(--text); margin: 0; }
   .muted { color: var(--muted); }
+  .small { font-size: 14px; margin-top: 0; }
+  .small a { color: var(--accent); }
+  .compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 16px 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 2px; }
+  .card b { font-size: 28px; }
+  .card.accent { border-color: var(--accent); }
+  .steps { padding-left: 20px; } .steps li { margin-bottom: 8px; }
   form { display: flex; gap: 8px; margin: 24px 0 8px; }
   input { flex: 1; min-width: 0; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font: inherit; }
   button, .btn { padding: 12px 18px; border-radius: 8px; border: 0; background: var(--accent); color: #0d1117; font: 600 16px system-ui, sans-serif; cursor: pointer; text-decoration: none; display: inline-block; }
@@ -37,14 +47,34 @@
 </head>
 <body>
 <main>
-  <h1>Did your liquidity actually beat holding?</h1>
-  <p class="muted">Most LP dashboards show the fees you earned, not what price moves cost you. Paste a Solana wallet to see your Meteora DLMM results compared with simply holding the tokens you deposited.</p>
+  <p class="eyebrow">For Meteora liquidity providers</p>
+  <h1>Your LP dashboard shows the fees.<br>It doesn't show what you lost.</h1>
+  <p class="lead">A liquidity pool sells your tokens as they go up and buys more as they go down. That often costs more than the fees you earn. Paste your wallet and see if providing liquidity actually beat just holding your tokens.</p>
 
   <form id="form">
-    <input id="wallet" placeholder="Solana wallet address" autocomplete="off" spellcheck="false" aria-label="Solana wallet address">
+    <input id="wallet" placeholder="Paste a Solana wallet address" autocomplete="off" spellcheck="false" aria-label="Solana wallet address">
     <button id="go">Check</button>
   </form>
+  <p class="muted small">Read-only. No wallet connection, no signatures. <a href="#" id="example">No wallet? Try an example →</a></p>
   <div id="error" role="alert"></div>
+
+  <section id="intro">
+    <h2>Example: why "+$450" can be a loss</h2>
+    <p class="muted">You put 10 SOL into a SOL-USDC pool when SOL is $100, so $1,000. Then SOL rises to $150.</p>
+    <div class="compare">
+      <div class="card"><span class="muted">Your dashboard says</span><b class="good">+$450</b><span class="muted">$1,420 in the pool + $30 fees</span></div>
+      <div class="card"><span class="muted">If you had just held 10 SOL</span><b>$1,500</b><span class="muted">no pool, no fees</span></div>
+      <div class="card accent"><span class="muted">Your real result</span><b class="bad">−$50</b><span class="muted">vs just holding</span></div>
+    </div>
+    <p class="muted">Studies of Uniswap found that about half of liquidity providers end up behind simply holding. Most never find out, because no dashboard shows this number.</p>
+
+    <h2>How it works</h2>
+    <ol class="steps">
+      <li><b>Paste any Solana wallet.</b> Yours or anyone's: on-chain data is public.</li>
+      <li><b>We read its Meteora DLMM positions</b> from Meteora's public data: what went in, what came out, the fees.</li>
+      <li><b>You get one honest number</b> per pool and in total, plus a card to share on X.</li>
+    </ol>
+  </section>
 
   <section id="result" hidden>
     <p id="verdict"></p>

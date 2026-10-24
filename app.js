@@ -3,6 +3,7 @@ import { num, summarize } from './calc.js';
 const API = 'https://dlmm.datapi.meteora.ag';
 const WALLET = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const PARALLEL = 8; // Meteora allows 30 requests/s
+const EXAMPLE = 'Abaqj8ivq6Uoinc9CQiiZ9GQNDB2RFSWqhpJKf9mN6Gu'; // an active public Meteora LP wallet
 
 const $ = id => document.getElementById(id);
 const usd = v => (v < 0 ? '−' : '') + '$' + Math.abs(v).toLocaleString('en-US', { maximumFractionDigits: Math.abs(v) < 100 ? 2 : 0 });
@@ -99,6 +100,7 @@ function render(s, user) {
     : 'Checking my honest LP results';
   $('share-x').href = `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(link)}`;
   drawCard(s);
+  $('intro').hidden = true;
   $('result').hidden = false;
 }
 
@@ -132,6 +134,11 @@ async function run(user) {
 }
 
 $('form').addEventListener('submit', e => { e.preventDefault(); run($('wallet').value.trim()); });
+$('example').addEventListener('click', e => {
+  e.preventDefault();
+  $('wallet').value = EXAMPLE;
+  run(EXAMPLE);
+});
 $('download').addEventListener('click', () => {
   const a = document.createElement('a');
   a.href = $('card').toDataURL('image/png'); a.download = 'lp-vs-hold.png'; a.click();
