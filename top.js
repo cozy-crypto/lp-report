@@ -1,12 +1,12 @@
 import { usd, signed, pct, tone } from './format.js';
-import { trackVisit, action } from './analytics.js';
+import { trackVisit, action, BACKEND } from './analytics.js';
 
 const $ = id => document.getElementById(id);
 const SHOW = 50;
 const short = w => `${w.slice(0, 4)}…${w.slice(-4)}`;
 const quantile = (sorted, q) => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))];
 
-let data, tab = 'fame', min = 0;
+let data, tab = 'fame', min = 0, verified = new Set(); // wallets whose owner proved them by signing
 
 function render() {
   const wallets = data.wallets.filter(w => w.dep >= min);
@@ -32,7 +32,7 @@ function render() {
   const rows = tab === 'fame' ? wallets : [...wallets].sort((a, b) => a.lp - b.lp);
   $('head').innerHTML = '<tr><th>#</th><th class="who">Wallet</th><th>Fees kept</th><th>Liquidity</th><th>Fees</th><th>Deposited</th><th class="pools">Main pools</th></tr>';
   $('body').innerHTML = rows.slice(0, SHOW).map((w, i) => `<tr><td>${i + 1}</td>
-    <td class="who"><a class="mono" href="./?wallet=${w.w}">${short(w.w)}</a></td>
+    <td class="who"><a class="mono" href="./?wallet=${w.w}">${short(w.w)}</a>${verified.has(w.w) ? ' <span class="badge-ok" title="Owner verified this wallet by signing">✓</span>' : ''}</td>
     <td class="${tone(w.k)}">${pct(w.k)}</td><td class="${tone(w.lp)}">${signed(w.lp)}</td><td>${usd(w.fees)}</td><td>${usd(w.dep)}</td>
     <td class="pools">${w.top.join(', ')}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">No wallets at this size yet</td></tr>';
   $('note').textContent = tab === 'fame'
@@ -61,6 +61,7 @@ $('body').addEventListener('click', e => {
 
 trackVisit('top');
 try {
+  verified = new Set(await fetch(`${BACKEND}/verified`).then(r => (r.ok ? r.json() : [])).catch(() => []));
   data = await (await fetch('data/leaderboard.json', { cache: 'no-cache' })).json();
   const day = new Date(data.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   $('lead').textContent = `${data.wallets.length.toLocaleString('en-US')} liquidity providers on Meteora, ranked by the share of fees they kept after price moves over the last ${data.days} days. Updated ${day}.`;

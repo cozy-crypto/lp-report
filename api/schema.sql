@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS waitlist (
   deposited_usd REAL,
   code       TEXT UNIQUE,              -- own referral code: shouldaheld.com/?j=<code>
   referred_by TEXT,                    -- code of whoever brought them
-  owns_wallet INTEGER NOT NULL DEFAULT 0, -- said the checked wallet is theirs (self-declared)
+  owns_wallet INTEGER NOT NULL DEFAULT 0, -- 0 no, 1 said the checked wallet is theirs, 2 proved it by signing
   created_at TEXT NOT NULL
 );
 
@@ -60,3 +60,9 @@ CREATE TABLE wallet_days (
   PRIMARY KEY (date, wallet)
 );
 CREATE INDEX wallet_days_wallet ON wallet_days (wallet, date);
+-- Wallets whose owner proved it by signing a message on the site (no transaction).
+CREATE TABLE verified_wallets (
+  wallet      TEXT PRIMARY KEY,
+  verified_at TEXT NOT NULL,
+  meta        TEXT                       -- JSON: {wallet app, country}
+);

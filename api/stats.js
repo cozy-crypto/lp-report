@@ -5,7 +5,7 @@ const day = n => new Date(Date.now() - n * 864e5).toISOString();
 export async function buildStats(env) {
   const q = (sql, ...args) => env.DB.prepare(sql).bind(...args).all().then(r => r.results);
   const since30 = day(30), since7 = day(7);
-  const [daily, sources, campaigns, shares, cards, kept, sizes, waitlist, actions, crawls] = await Promise.all([
+  const [daily, sources, campaigns, shares, cards, kept, sizes, waitlist, actions, [verified], crawls] = await Promise.all([
     // One row per day: the whole funnel, including the sharing loop.
     q(`SELECT substr(created_at, 1, 10) AS date,
          sum(type = 'visit') AS visits,
@@ -43,10 +43,11 @@ export async function buildStats(env) {
        FROM (SELECT wallet_hash, json_extract(meta, '$.depositedUsd') AS d FROM events
              WHERE type = 'check' AND ${OK} AND created_at >= ?1) GROUP BY bucket`, since30),
     q(`SELECT count(*) AS total, sum(role = 'copy') AS wantCopy, sum(role = 'lead') AS wantLead, sum(role = 'curious') AS curious,
-         sum(owns_wallet AND fees_kept >= 0.5 AND fees_usd >= 500) AS leaderCandidates, sum(owns_wallet) AS ownWallet, sum(fees_usd >= 5000 OR deposited_usd >= 50000) AS bigLps,
+         sum(owns_wallet AND fees_kept >= 0.5 AND fees_usd >= 500) AS leaderCandidates, sum(owns_wallet >= 1) AS ownWallet, sum(owns_wallet = 2) AS verified, sum(fees_usd >= 5000 OR deposited_usd >= 50000) AS bigLps,
          sum(referred_by IS NOT NULL) AS referred FROM waitlist`),
     q(`SELECT json_extract(meta, '$.name') AS action, count(*) AS n FROM events
        WHERE type = 'action' AND created_at >= ?1 GROUP BY action ORDER BY n DESC`, since7),
+    q(`SELECT count(*) AS n FROM verified_wallets`),
     q(`SELECT date, pools, wallets_found AS walletsFound, crawled, ranked, skipped, failed, seconds FROM crawl_runs
        ORDER BY date DESC LIMIT 7`),
   ]);
@@ -54,6 +55,6 @@ export async function buildStats(env) {
     generatedAt: new Date().toISOString(),
     notes: 'daily: last 30 days, newest first. sources, campaigns, shares, cards, actions: last 7 days. buckets: last 30 days, unique wallets. '
       + 'cardsPosted = share cards a platform fetched for a preview (the link was posted); postedOn lists where.',
-    daily, sources, campaigns, shares, cards, feesKeptBuckets: kept, depositBuckets: sizes, waitlist: waitlist[0], actions, crawls,
+    daily, sources, campaigns, shares, cards, feesKeptBuckets: kept, depositBuckets: sizes, waitlist: waitlist[0], actions, verifiedWallets: verified.n, crawls,
   };
 }

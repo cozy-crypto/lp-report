@@ -6,7 +6,8 @@ import { buildStats } from './stats.js';
 // Who to talk to first. Thresholds are a first guess, tune them once real leads come in.
 export function segments(l) {
   return [
-    l.owns_wallet && l.fees_kept >= 0.5 && l.fees_usd >= 500 && 'leader candidate', // ponytail: self-declared until wallet signing exists
+    l.owns_wallet >= 1 && l.fees_kept >= 0.5 && l.fees_usd >= 500 && 'leader candidate',
+    l.owns_wallet === 2 && 'verified',
     (l.fees_usd >= 5000 || l.deposited_usd >= 50000) && 'big LP',
     l.role === 'copy' && 'wants to copy',
     l.role === 'lead' && 'wants to lead',
@@ -44,7 +45,8 @@ async function accessEmail(req, env) {
 }
 
 const leadsQuery = env => env.DB.prepare('SELECT * FROM waitlist ORDER BY created_at DESC').all().then(r => r.results);
-const priority = l => (segments(l).includes('leader candidate') ? 1e12 : 0) + (l.fees_usd ?? 0);
+const priority = l => (l.owns_wallet ?? 0) * 1e13 + (segments(l).includes('leader candidate') ? 1e12 : 0) + (l.fees_usd ?? 0);
+const GROUPS = [[2, '✓ Verified wallet owners'], [1, 'Said the wallet is theirs (not verified)'], [0, 'Not their wallet / no wallet']];
 // A failed check (Meteora down, bad data) is stored as a check with meta.error; everything else skips those.
 const OK = "json_extract(meta, '$.error') IS NULL";
 
@@ -156,10 +158,13 @@ async function page(env, email) {
 <div class="cards">${['below 0%', '0–49%', '50–99%', '100%+', 'too few fees'].map(b => `<div class="card"><span class="muted">${b}</span><b>${kept.find(r => r.bucket === b)?.wallets ?? 0}</b></div>`).join('')}</div>
 
 <h2>Leads (${leads.length}) <small><a href="/leads.csv">Download CSV</a></small></h2>
-<div class="cards">${['leader candidate', 'big LP', 'wants to copy', 'wants to lead'].map(s => `<div class="card"><span class="muted">${s}</span><b>${segCount(s)}</b></div>`).join('')}</div>
-<p class="muted">Leader candidate: says the wallet is theirs, kept 50%+ of fees with $500+ earned. Big LP: $5,000+ fees or $50,000+ deposited. Sorted: leader candidates first, then by fees.</p>
+<div class="cards">${['leader candidate', 'verified', 'big LP', 'wants to copy', 'wants to lead'].map(s => `<div class="card"><span class="muted">${s}</span><b>${segCount(s)}</b></div>`).join('')}</div>
+<p class="muted">Leader candidate: the wallet is theirs (said or verified), kept 50%+ of fees with $500+ earned. Verified: proved the wallet by signing. Big LP: $5,000+ fees or $50,000+ deposited. Sorted: leader candidates first, then by fees.</p>
 <div class="wrap"><table><thead><tr><th>Contact</th><th>Wants</th><th>Segments</th><th>Fees kept</th><th>Fees</th><th>Deposited</th><th>Wallet</th><th>Joined</th></tr></thead>
-<tbody>${sorted.map(leadRow).join('') || '<tr><td colspan="8" class="muted">No leads yet</td></tr>'}</tbody></table></div>
+<tbody>${GROUPS.map(([o, title]) => {
+  const g = sorted.filter(l => (l.owns_wallet ?? 0) === o);
+  return g.length ? `<tr><th colspan="8">${title} (${g.length})</th></tr>${g.map(leadRow).join('')}` : '';
+}).join('') || '<tr><td colspan="8" class="muted">No leads yet</td></tr>'}</tbody></table></div>
 </main></body></html>`, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } });
 }
 

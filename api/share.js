@@ -1,6 +1,7 @@
 // Share links: the site uploads the receipt card it drew, gets r.shouldaheld.com/<id> back,
 // and that page carries the card as its X preview before sending visitors to the report.
 import { SITE, WALLET, num, now, hashWallet, esc, usd, pct } from './util.js';
+import { isVerified } from './verify.js';
 
 // Platforms fetch a posted link to build its preview, so a bot hit on the share page means the card was posted there.
 // ponytail: user-agent match; a platform that hides its crawler shows up as a human click instead.
@@ -50,7 +51,7 @@ export async function sharePage(req, env, ctx, id, base) {
   const title = card.fees_kept == null
     ? `Liquidity earned me ${usd(card.lp_usd)} after price moves`
     : `I kept ${pct(card.fees_kept)} of my LP fees after price moves`;
-  const desc = 'Your PnL includes the market. See what providing liquidity actually earned you.';
+  const desc = `${await isVerified(env, card.wallet) ? '✓ Verified wallet owner. ' : ''}Your PnL includes the market. See what providing liquidity actually earned you.`;
   const image = `${base}/${id}.png`;
   return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>${esc(title)} — Shoulda Held?</title>

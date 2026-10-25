@@ -31,7 +31,7 @@ function benchmark(s, b) {
   return { beat: kept.filter(k => k < s.feesKept).length / kept.length, n: kept.length, top: kept[Math.floor(0.9 * kept.length)] };
 }
 
-function render(s, user, b) {
+function render(s, user, b, verified) {
   const bench = benchmark(s, b);
   const set = (id, v, cls = '') => { $(id).textContent = v; $(id).className = cls; };
   $('full').hidden = !s.rows.length;
@@ -61,10 +61,13 @@ function render(s, user, b) {
 
   lastResult = { wallet: user, feesKept: s.feesKept, feesUsd: s.feesUsd, lpUsd: s.vsHodl, depositedUsd: s.depositedUsd };
   mine = s; current = { s, bench, user };
+  walletVerified = verified.has(user);
   // Anyone can paste any wallet, so texts stay third-person until the visitor says it's theirs.
   // The example and a wallet opened from someone's shared card are never the visitor's.
-  owner = user === EXAMPLE || (REF && user === params.get('wallet')) ? false : null;
-  $('owner').hidden = owner === false;
+  owner = store.get(`verified:${user}`) ? true // this browser signed for it earlier
+    : user === EXAMPLE || (REF && user === params.get('wallet')) ? false : null;
+  $('owner').hidden = owner !== null;
+  $('verify').hidden = true;
   $('duel-result').hidden = true;
   applyOwner();
   $('shared').hidden = !(REF && user === params.get('wallet'));
@@ -75,12 +78,18 @@ function render(s, user, b) {
 
 let shareText = '', cardKind = 'receipt', mine = null, duelText = '';
 let owner = null, current = null; // owner: true = the visitor said this wallet is theirs
+let walletVerified = false;        // the wallet's owner proved it by signing (anyone may be looking at it)
+
+// Wallets proven by signing; the receipt and cards of these wallets carry a ✓.
+const verifiedWallets = fetch(`${BACKEND}/verified`).then(r => (r.ok ? r.json() : [])).then(a => new Set(a)).catch(() => new Set());
+const store = { get: k => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
 
 // Everything that says "I" or pitches earning from the wallet depends on whose wallet it is.
 function applyOwner() {
   const { s, bench, user } = current;
   const me = owner === true;
   lastResult.owner = me;
+  $('verified-badge').hidden = !walletVerified;
   $('verdict').textContent = verdict(s, me);
   const rank = topShare(bench);
   cardKind = rank ? 'rank' : 'receipt';
@@ -103,8 +112,59 @@ function applyOwner() {
 function setOwner(me) {
   owner = me;
   $('owner').hidden = true;
+  $('verify').hidden = !me || walletVerified;
   action('owner', { mine: me });
   applyOwner();
+}
+
+// Must match verifyMessage() in api/verify.js character for character.
+const verifyMessage = (wallet, issuedAt) => 'shouldaheld.com wants you to prove you own this Solana wallet.\n\n'
+  + `Wallet: ${wallet}\nIssued at: ${issuedAt}\n\nSigning is free. It does not send a transaction or give access to your funds.`;
+const walletApp = () => [['phantom', window.phantom?.solana], ['solflare', window.solflare], ['backpack', window.backpack], ['solana', window.solana]]
+  .find(([, p]) => p?.signMessage);
+
+// Sign a plain message with the wallet app (no transaction) and let the server check it against the address.
+async function verifyOwnership() {
+  const wallet = current.user, msg = t => { $('verify-msg').textContent = t; };
+  const found = walletApp();
+  if (!found) {
+    // Phones have no extensions: reopen this page inside the wallet app's browser.
+    const here = encodeURIComponent(location.href), ref = encodeURIComponent(location.origin);
+    $('verify-apps').innerHTML = matchMedia('(max-width: 640px)').matches
+      ? `Open this page in your wallet app: <a href="https://phantom.app/ul/browse/${here}?ref=${ref}">Phantom</a> · <a href="https://solflare.com/ul/v1/browse/${here}?ref=${ref}">Solflare</a>`
+      : 'No Solana wallet found in this browser. Install <a href="https://phantom.app" target="_blank" rel="noopener">Phantom</a> or <a href="https://solflare.com" target="_blank" rel="noopener">Solflare</a> and reload.';
+    action('verify_no_wallet');
+    return;
+  }
+  const [app, provider] = found;
+  $('verify-go').disabled = true; msg('');
+  try {
+    const conn = await provider.connect();
+    const connected = (conn?.publicKey ?? provider.publicKey)?.toString();
+    if (connected !== wallet) throw new Error(`Your wallet app is on ${connected?.slice(0, 4)}…${connected?.slice(-4)}. Switch to ${wallet.slice(0, 4)}…${wallet.slice(-4)} and try again`);
+    const issuedAt = new Date().toISOString();
+    const signed = await provider.signMessage(new TextEncoder().encode(verifyMessage(wallet, issuedAt)), 'utf8');
+    const sig = signed?.signature ?? signed;
+    const r = await fetch(`${BACKEND}/verify`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wallet, issuedAt, app, signature: btoa(String.fromCharCode(...new Uint8Array(sig))) }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || 'Verification failed');
+    store.set(`verified:${wallet}`, '1');
+    walletVerified = true; owner = true;
+    $('verify').hidden = true; $('owner').hidden = true;
+    applyOwner();
+    if (lastSignup) { // already in line: the server now sees the wallet as verified and moves them up
+      const q = await fetch(`${BACKEND}/waitlist`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: lastSignup });
+      if (q.ok) showQueue(await q.json());
+    }
+  } catch (e) {
+    msg(/reject|denied|cancel/i.test(e.message) ? 'Signing cancelled.' : `${e.message}.`);
+    action('verify_failed', { app, reason: e.message.slice(0, 60) });
+  } finally {
+    $('verify-go').disabled = false;
+  }
 }
 const intent = (text, url) => `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
 // "12%" when the wallet is in the better half of ranked LPs: a brag people actually post.
@@ -167,9 +227,13 @@ async function runDuel(e) {
 }
 
 // Strong LPs are pitched the leader side, everyone else the copying side.
+// One waitlist for everyone, pitched by who's looking: a verified owner gets priority, an owner who only said so
+// is offered to verify (50 places up), anyone else is pitched copying.
 function renderWaitlist(s) {
   const lead = owner === true && s.feesKept >= 0.5; // only an owner can be copied and paid
-  $('wl-title').textContent = lead ? 'You kept most of your fees. Want to get paid for it?' : 'Want to copy LPs who keep their fees?';
+  $('wl-title').textContent = (walletVerified && owner ? '✓ Verified LP. ' : '')
+    + (lead ? 'You kept most of your fees. Want to get paid for it?' : 'Want to copy LPs who keep their fees?');
+  $('wl-verify').hidden = !(owner === true && !walletVerified);
   $('wl-text').textContent = lead
     ? "We're building copy-LP: others follow your positions automatically, and you earn a share of the fees they make."
     : "We're building copy-LP: follow the positions of liquidity providers with the best results, automatically, in your own wallet.";
@@ -187,7 +251,7 @@ async function joinWaitlist(e) {
     const r = await fetch(`${BACKEND}/waitlist`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, x, role: new FormData($('waitlist')).get('role'), website: $('wl-website').value, referredBy, source: firstSource, ...lastResult }),
+      body: (lastSignup = JSON.stringify({ email, x, role: new FormData($('waitlist')).get('role'), website: $('wl-website').value, referredBy, source: firstSource, ...lastResult })),
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.error || 'Something went wrong');
@@ -201,11 +265,13 @@ async function joinWaitlist(e) {
 }
 
 // After joining: place in line and a personal link; every LP who joins through it moves them up.
+let lastSignup = null; // re-sent after verifying, to move up in line
+
 function showQueue(d) {
   const link = `https://shouldaheld.com/?j=${d.code}&utm_source=referral`;
   $('wl-form').hidden = true; $('wl-done').hidden = false;
   $('wl-place').textContent = `#${d.position.toLocaleString('en-US')}`;
-  $('wl-of').textContent = `of ${d.total.toLocaleString('en-US')} in line for copy-LP${d.referrals ? ` · ${d.referrals} joined through you` : ''}`;
+  $('wl-of').textContent = `of ${d.total.toLocaleString('en-US')} in line for copy-LP${d.verified ? ' · ✓ verified, 50 places up' : ''}${d.referrals ? ` · ${d.referrals} joined through you` : ''}`;
   $('wl-link').value = link;
   $('wl-share').href = intent(`I'm #${d.position} in line for copy-LP. First, see how much of your LP fees you actually keep: @shouldaheld`, link);
 }
@@ -228,6 +294,14 @@ function drawCard(s, bench) {
   if (bench) { g.fillStyle = '#58a6ff'; g.font = '600 34px system-ui, sans-serif'; g.fillText(`Better than ${pct(bench.beat)} of Meteora LPs`, 80, 470); }
   g.fillStyle = '#8b949e'; g.font = '400 26px system-ui, sans-serif';
   g.fillText('Shoulda held? Get your receipt · @shouldaheld', 80, 550);
+  badge(g);
+}
+
+// ✓ in the card's corner when the wallet's owner proved it by signing.
+function badge(g) {
+  if (!walletVerified) return;
+  g.fillStyle = 'rgba(63, 185, 80, .15)'; g.beginPath(); g.roundRect(820, 60, 300, 56, 28); g.fill();
+  g.fillStyle = '#3fb950'; g.font = '600 28px system-ui, sans-serif'; g.fillText('✓ Verified owner', 850, 98);
 }
 
 function drawRank(s, bench, rank) {
@@ -241,6 +315,7 @@ function drawRank(s, bench, rank) {
   g.fillText(`Kept ${pct(s.feesKept)} of ${usd(s.feesUsd)} in fees · liquidity ${signed(s.vsHodl)}`, 80, 400);
   g.fillStyle = '#8b949e'; g.font = '400 26px system-ui, sans-serif';
   g.fillText('Where do you rank? shouldaheld.com · @shouldaheld', 80, 550);
+  badge(g);
 }
 
 function drawDuel(a, b, name, win) {
@@ -268,7 +343,7 @@ async function run(user) {
     const started = Date.now();
     let found = 0;
     const s = await report(user, (done, total) => { found = total; $('go').textContent = `Reading pool ${done} of ${total}…`; });
-    render(s, user, await board);
+    render(s, user, await board, await verifiedWallets);
     track('check', {
       wallet: user, feesKept: s.feesKept, feesUsd: s.feesUsd, pools: s.rows.length,
       meta: {
@@ -296,6 +371,8 @@ $('example').addEventListener('click', e => {
 $('share-x').addEventListener('click', shareOnX);
 $('owner-yes').addEventListener('click', () => setOwner(true));
 $('owner-no').addEventListener('click', () => setOwner(false));
+$('verify-go').addEventListener('click', verifyOwnership);
+$('wl-verify-go').addEventListener('click', () => { $('verify').hidden = false; $('verify').scrollIntoView({ behavior: 'smooth', block: 'center' }); verifyOwnership(); });
 $('duel-form').addEventListener('submit', runDuel);
 $('duel-share').addEventListener('click', e => {
   e.preventDefault();

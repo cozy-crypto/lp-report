@@ -51,6 +51,11 @@
       <button id="check-own" type="button">Check your wallet</button>
     </div>
     <p id="verdict"></p>
+    <div id="verify" class="verify" hidden>
+      <div><b>Prove it's yours</b> <span class="muted">— sign a free message in Phantom, Solflare or Backpack. No transaction, no access to funds. Your receipt, cards and leaderboard spot get a ✓.</span></div>
+      <button type="button" class="btn" id="verify-go">Verify with wallet</button>
+      <p id="verify-apps" class="small"></p><p id="verify-msg" class="err-text" role="status"></p>
+    </div>
     <div id="owner" class="owner" hidden>
       <span>Is this your wallet?</span>
       <button type="button" class="btn secondary" id="owner-yes">Yes, it's mine</button>
@@ -60,6 +65,7 @@
     <div id="full">
       <div class="paper">
         <div class="title">RECEIPT</div>
+        <div class="verified-stamp" id="verified-badge" hidden>✓ VERIFIED OWNER</div>
         <div class="sub-title" id="scope"></div>
         <div class="rule"></div>
         <div class="row"><span>Your PnL</span><b id="pnl"></b></div>
@@ -100,6 +106,7 @@
       <form id="waitlist" class="waitlist" novalidate>
         <h2 id="wl-title"></h2>
         <p class="muted" id="wl-text"></p>
+        <p id="wl-verify" class="wl-verify" hidden>Verified LPs jump <b>50 places</b> in line. <button type="button" id="wl-verify-go" class="btn secondary">Verify with wallet</button></p>
         <div id="wl-form">
         <fieldset class="roles">
           <legend>I'm interested in</legend>

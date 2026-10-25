@@ -65,6 +65,13 @@ button:disabled { opacity: .6; cursor: wait; }
 #scope, #unpriced { margin: 22px 0 0; }
 .owner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: -6px 0 20px; color: var(--muted); }
 .owner .btn { padding: 8px 14px; font-size: 15px; }
+.verify { display: flex; gap: 12px 16px; align-items: center; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--good); border-radius: 12px; padding: 14px 16px; margin: -6px 0 20px; }
+.verify > div { flex: 1 1 300px; }
+.verify p { margin: 0; flex-basis: 100%; } .verify p:empty { display: none; }
+.verified-stamp { text-align: center; color: var(--ink-good); font-weight: 700; font-size: 13px; letter-spacing: .1em; margin: -2px 0 6px; }
+.badge-ok { color: var(--good); margin-left: 4px; }
+.wl-verify { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: -6px 0 18px; }
+.wl-verify .btn { padding: 8px 14px; font-size: 15px; }
 .bench { display: flex; gap: 16px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; margin: 28px 0 0; }
 .bench b { font-size: 36px; color: var(--accent); font-variant-numeric: tabular-nums; }
 .bench p { margin: 0; color: var(--muted); }
