@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LP vs Hold — honest Meteora LP report</title>
-<meta name="description" content="See whether providing liquidity on Meteora actually beat just holding your tokens.">
+<title>Shoulda Held? — what liquidity actually earned you</title>
+<meta name="description" content="Your PnL includes the market. See what providing liquidity on Solana actually earned you, and how much of your fees you kept.">
 <style>
   :root { --bg: #0d1117; --panel: #161b22; --line: #30363d; --text: #e6edf3; --muted: #8b949e; --good: #3fb950; --bad: #f85149; --accent: #58a6ff; }
   * { box-sizing: border-box; }
@@ -30,9 +30,10 @@
   #error { color: var(--bad); min-height: 24px; }
   .hero { font-size: 64px; font-weight: 700; margin: 4px 0 16px; }
   .good { color: var(--good); } .bad { color: var(--bad); }
-  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 24px; }
-  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
-  .stat b { display: block; font-size: 22px; }
+  .receipt { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; font-variant-numeric: tabular-nums; }
+  .line { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; }
+  .line + .line { border-top: 1px dashed var(--line); }
+  .line.sub { padding-left: 16px; } .line.subsub { padding-left: 32px; color: var(--muted); }
   table { width: 100%; border-collapse: collapse; font-size: 15px; }
   th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); }
   th { color: var(--muted); font-weight: 500; }
@@ -47,49 +48,52 @@
 </head>
 <body>
 <main>
-  <p class="eyebrow">For Meteora liquidity providers</p>
-  <h1>Your LP dashboard shows the fees.<br>It doesn't show what you lost.</h1>
-  <p class="lead">A liquidity pool sells your tokens as they go up and buys more as they go down. That often costs more than the fees you earn. Paste your wallet and see if providing liquidity actually beat just holding your tokens.</p>
+  <p class="eyebrow">For Solana liquidity providers (LPs)</p>
+  <h1>Your PnL includes the market.<br>We show what liquidity earned you.</h1>
+  <p class="lead">When your tokens go up, your PnL goes up too, even if providing liquidity lost money. Paste a wallet to split the result into what the market did and what liquidity actually earned, and see how much of your fees you kept.</p>
 
   <form id="form">
     <input id="wallet" placeholder="Paste a Solana wallet address" autocomplete="off" spellcheck="false" aria-label="Solana wallet address">
     <button id="go">Check</button>
   </form>
-  <p class="muted small">Read-only. No wallet connection, no signatures. <a href="#" id="example">No wallet? Try an example →</a></p>
+  <p class="muted small">Read-only. No wallet connection, no signatures. Supports Meteora DLMM for now. <a href="#" id="example">No wallet? Try an example →</a></p>
   <div id="error" role="alert"></div>
 
   <section id="intro">
-    <h2>Example: why "+$450" can be a loss</h2>
-    <p class="muted">You put 10 SOL into a SOL-USDC pool when SOL is $100, so $1,000. Then SOL rises to $150.</p>
+    <h2>Example: a +$450 PnL that earned nothing</h2>
+    <p class="muted">You put 10 SOL into a SOL-USDC pool when SOL is $100, so $1,000. SOL rises to $150. The pool now holds $1,420 of tokens, plus $30 of fees.</p>
     <div class="compare">
-      <div class="card"><span class="muted">Your dashboard says</span><b class="good">+$450</b><span class="muted">$1,420 in the pool + $30 fees</span></div>
-      <div class="card"><span class="muted">If you had just held 10 SOL</span><b>$1,500</b><span class="muted">no pool, no fees</span></div>
-      <div class="card accent"><span class="muted">Your real result</span><b class="bad">−$50</b><span class="muted">vs just holding</span></div>
+      <div class="card"><span class="muted">Your PnL</span><b class="good">+$450</b><span class="muted">$1,450 now vs $1,000 in</span></div>
+      <div class="card"><span class="muted">From the market</span><b>+$500</b><span class="muted">SOL went up; holding 10 SOL gives $1,500</span></div>
+      <div class="card accent"><span class="muted">From liquidity</span><b class="bad">−$50</b><span class="muted">$30 fees, −$80 from price moves</span></div>
     </div>
-    <p class="muted">Studies of Uniswap found that about half of liquidity providers end up behind simply holding. Most never find out, because no dashboard shows this number.</p>
+    <p class="muted">Fees kept: <b class="bad">−167%</b>. Price moves cost more than the fees earned, so holding would have been better. A study of Uniswap found about half of liquidity providers ended up behind simply holding.</p>
 
     <h2>How it works</h2>
     <ol class="steps">
       <li><b>Paste any Solana wallet.</b> Yours or anyone's: on-chain data is public.</li>
-      <li><b>We read its Meteora DLMM positions</b> from Meteora's public data: what went in, what came out, the fees.</li>
-      <li><b>You get one honest number</b> per pool and in total, plus a card to share on X.</li>
+      <li><b>We read its liquidity positions</b> from public data: what went in, what came out, the fees. Meteora DLMM for now.</li>
+      <li><b>You get your receipt:</b> PnL split into market and liquidity, and how much of your fees you kept. Plus a card to share on X.</li>
     </ol>
   </section>
 
   <section id="result" hidden>
     <p id="verdict"></p>
     <div id="full">
+    <span class="muted">Fees kept</span>
     <div id="hero" class="hero"></div>
-    <div class="stats">
-      <div class="stat"><span class="muted">Fees earned</span><b id="fees"></b></div>
-      <div class="stat"><span class="muted">Deposited</span><b id="deposited"></b></div>
-      <div class="stat"><span class="muted">PnL in dollars (Meteora)</span><b id="meteora"></b></div>
-      <div class="stat"><span class="muted">Pools</span><b id="pools"></b></div>
+    <div class="receipt">
+      <div class="line"><span>Your PnL</span><b id="pnl"></b></div>
+      <div class="line sub"><span>From the market</span><b id="market"></b></div>
+      <div class="line sub"><span>From liquidity</span><b id="lp"></b></div>
+      <div class="line subsub"><span>Fees earned</span><b id="fees"></b></div>
+      <div class="line subsub"><span>Price-move cost</span><b id="cost"></b></div>
     </div>
+    <p class="muted" id="scope"></p>
     <p id="unpriced" class="muted" hidden></p>
 
     <table>
-      <thead><tr><th>Pool</th><th>vs holding</th><th>Fees</th><th>Deposited</th></tr></thead>
+      <thead><tr><th>Pool</th><th>Fees kept</th><th>From liquidity</th><th>Fees</th></tr></thead>
       <tbody id="rows"></tbody>
     </table>
     <p id="rows-note" class="muted"></p>
@@ -104,9 +108,10 @@
 
   <details>
     <summary>How is this calculated?</summary>
-    <p>For every position we compare what you got back (withdrawals, plus what is still in the position if it is open) with the tokens you put in, and add the fees you earned. Closed positions are valued at the prices when you exited, so market moves after you left don't count. Open positions are valued at today's prices. Positive means LP left you with more than holding would have; negative means holding would have been better.</p>
-    <p>"PnL in dollars" is Meteora's own number: it compares with the dollar value at deposit time, so it also includes the market going up or down.</p>
-    <p>Covers pools where you closed a Meteora DLMM position in the last 365 days, plus pools with open positions. If a position was swapped entirely into one token, its exit price is estimated from the edge of its price range. Tokens without a current price count as $0. Read-only: we never ask you to connect a wallet.</p>
+    <p><b>Your PnL</b> is the dollar result reported by Meteora: what you have now (or got out) vs the dollar value you put in. It includes the market moving your tokens up or down.</p>
+    <p><b>From liquidity</b> compares each position with simply holding the tokens you put in: what you got back (withdrawals, plus what is still in the position if it is open) minus the tokens you deposited, plus the fees you earned. Closed positions are valued at the prices when you exited, open ones at today's prices. <b>From the market</b> is the rest of your PnL.</p>
+    <p><b>Fees kept</b> is "from liquidity" divided by fees earned. 100% means price moves cost you nothing; 0% means they ate all your fees; below 0% means providing liquidity lost money compared with holding. Shown only when fees are at least $1.</p>
+    <p>Supports Meteora DLMM for now. Covers pools where you closed a position in the last 365 days, plus pools with open positions. If a position was swapped entirely into one token, its exit price is estimated from the edge of its price range. Tokens without a current price count as $0. Read-only: we never ask you to connect a wallet.</p>
   </details>
 
   <footer>

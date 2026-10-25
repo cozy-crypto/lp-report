@@ -73,31 +73,44 @@ async function report(user, progress) {
   return summarize(pools);
 }
 
+const pct = k => (k === undefined ? '—' : `${Math.round(k * 100)}%`);
+const tone = v => (v >= 0 ? 'good' : 'bad');
+
+function verdict(s) {
+  if (!s.rows.length) return 'No Meteora DLMM positions found for this wallet in the last 365 days.';
+  const k = s.feesKept;
+  if (k === undefined) return s.vsHodl >= 0 ? 'Liquidity did a little better than holding.' : 'Holding would have done a little better.';
+  if (k >= 1) return 'Liquidity beat holding by more than the fees you earned.';
+  if (k >= 0.5) return 'You kept most of the fees you earned.';
+  if (k >= 0) return 'Price moves ate most of the fees you earned.';
+  return 'Price moves cost you more than your fees. Shoulda held.';
+}
+
 function render(s, user) {
-  const win = s.vsHodl >= 0;
-  $('verdict').textContent = s.rows.length === 0
-    ? 'No Meteora DLMM positions found for this wallet in the last 365 days.'
-    : win ? 'Providing liquidity beat just holding your tokens.' : 'Just holding your tokens would have done better.';
+  const set = (id, v, cls = '') => { $(id).textContent = v; $(id).className = cls; };
+  $('verdict').textContent = verdict(s);
   $('full').hidden = !s.rows.length;
-  $('hero').textContent = signed(s.vsHodl);
-  $('hero').className = 'hero ' + (win ? 'good' : 'bad');
-  $('fees').textContent = usd(s.feesUsd);
-  $('deposited').textContent = usd(s.depositedUsd);
-  $('meteora').textContent = signed(s.pnlUsd);
-  $('pools').textContent = s.rows.length;
+  $('hero').textContent = pct(s.feesKept);
+  $('hero').className = 'hero ' + tone(s.feesKept ?? s.vsHodl);
+  set('pnl', signed(s.pnlUsd));
+  set('market', signed(s.marketUsd));
+  set('lp', signed(s.vsHodl), tone(s.vsHodl));
+  set('fees', signed(s.feesUsd));
+  set('cost', signed(s.priceCostUsd));
+  $('scope').textContent = `${s.rows.length} pools · ${usd(s.depositedUsd)} deposited in total`;
   $('unpriced').hidden = !s.unpriced;
   $('unpriced').textContent = `${s.unpriced} open pool(s) hold tokens with no current price; those tokens count as $0.`;
 
   const tr = r => `<tr><td>${r.name}${r.open ? ' <span class="tag">open</span>' : ''}</td>` +
-    `<td class="${r.vsHodl >= 0 ? 'good' : 'bad'}">${signed(r.vsHodl)}</td><td>${usd(r.feesUsd)}</td><td>${usd(r.depositedUsd)}</td></tr>`;
+    `<td class="${tone(r.feesKept ?? r.vsHodl)}">${pct(r.feesKept)}</td><td class="${tone(r.vsHodl)}">${signed(r.vsHodl)}</td><td>${usd(r.feesUsd)}</td></tr>`;
   const top = s.rows.length > 10 ? [...s.rows.slice(0, 5), ...s.rows.slice(-5)] : s.rows;
   $('rows').innerHTML = top.map(tr).join('');
   $('rows-note').textContent = s.rows.length > 10 ? `Best 5 and worst 5 of ${s.rows.length} pools.` : '';
 
   const link = `${location.origin}${location.pathname}?wallet=${user}`;
-  const text = s.rows.length
-    ? `My Meteora LP vs just holding: ${signed(s.vsHodl)} across ${s.rows.length} pools (fees earned: ${usd(s.feesUsd)}). ${win ? 'Not bad.' : 'Shoulda held.'} Get your receipt from @shouldaheld`
-    : 'Checking my honest LP receipt from @shouldaheld';
+  const text = s.feesKept === undefined
+    ? `Liquidity earned me ${signed(s.vsHodl)} after price moves. Get your receipt from @shouldaheld`
+    : `I kept ${pct(s.feesKept)} of my LP fees after price moves: ${signed(s.vsHodl)} from liquidity, the rest of my PnL was the market. ${s.feesKept >= 0.5 ? 'Not bad.' : s.feesKept >= 0 ? 'Could be worse.' : 'Shoulda held.'} Get your receipt from @shouldaheld`;
   $('share-x').href = `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(link)}`;
   drawCard(s);
   $('intro').hidden = true;
@@ -107,16 +120,17 @@ function render(s, user) {
 // Share card for X, 1200×630.
 function drawCard(s) {
   const c = $('card'), g = c.getContext('2d');
-  const win = s.vsHodl >= 0;
+  const measured = s.feesKept !== undefined;
+  const good = (s.feesKept ?? s.vsHodl) >= 0;
   g.fillStyle = '#0d1117'; g.fillRect(0, 0, 1200, 630);
   g.fillStyle = '#8b949e'; g.font = '500 34px system-ui, sans-serif';
-  g.fillText('My Meteora LP vs just holding', 80, 140);
-  g.fillStyle = win ? '#3fb950' : '#f85149'; g.font = '700 150px system-ui, sans-serif';
-  g.fillText(signed(s.vsHodl), 80, 320);
+  g.fillText(measured ? 'LP fees I kept after price moves' : 'What liquidity earned me', 80, 140);
+  g.fillStyle = good ? '#3fb950' : '#f85149'; g.font = '700 150px system-ui, sans-serif';
+  g.fillText(measured ? pct(s.feesKept) : signed(s.vsHodl), 80, 320);
   g.fillStyle = '#e6edf3'; g.font = '400 34px system-ui, sans-serif';
-  g.fillText(`${s.rows.length} pools · fees earned ${usd(s.feesUsd)} · deposited ${usd(s.depositedUsd)}`, 80, 410);
+  g.fillText(`From liquidity ${signed(s.vsHodl)} · fees ${usd(s.feesUsd)} · market ${signed(s.marketUsd)}`, 80, 410);
   g.fillStyle = '#8b949e'; g.font = '400 26px system-ui, sans-serif';
-  g.fillText('@shouldaheld · closed positions at exit prices · data: Meteora', 80, 550);
+  g.fillText('Shoulda held? Get your receipt · @shouldaheld', 80, 550);
 }
 
 async function run(user) {

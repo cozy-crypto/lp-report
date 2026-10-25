@@ -1,6 +1,6 @@
 // Run: node lp-report/calc.test.mjs
 import assert from 'node:assert/strict';
-import { vsHodlUsd, exitPrices, summarize } from './calc.js';
+import { vsHodlUsd, exitPrices, summarize, feesKept } from './calc.js';
 
 const pos = o => ({
   open: false, minPrice: 0, maxPrice: 0, depositedUsd: 0, feesUsd: 0, pnlUsd: 0,
@@ -40,5 +40,19 @@ near(s.vsHodl, 21);
 near(s.feesUsd, 21);
 assert.equal(s.rows[0].address, 'a');
 assert.equal(s.unpriced, 1);
+
+// Fees kept: liquidity result ÷ fees. All 21 of fees kept here (no price-move cost overall).
+near(s.feesKept, 1);
+near(s.priceCostUsd, 0);
+assert.equal(feesKept(5, 0.5), undefined); // under $1 of fees: not measurable
+near(feesKept(-50, 30), -50 / 30);         // landing-page example: −167%
+
+// Landing-page example: 10 SOL in at $100 ($1,000), SOL now $150. Pool holds 4 SOL + 820 USDC ($1,420), $30 fees.
+// PnL +$450 = market +$500 (holding 10 SOL → $1,500) + liquidity −$50 (fees +$30, price-move cost −$80).
+const m = summarize([{ address: 'e', name: 'SOL-USDC', today: { x: 150, y: 1 }, positions: [pos({ open: true, depositedUsd: 1000, pnlUsd: 450, feesUsd: 30, deposited: { x: 10, y: 0 }, balance: { x: 4, y: 820 } })] }]);
+near(m.vsHodl, -50);
+near(m.marketUsd, 500);
+near(m.priceCostUsd, -80);
+near(m.feesKept, -50 / 30);
 
 console.log('calc ok');

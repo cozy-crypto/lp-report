@@ -25,7 +25,13 @@ export function vsHodlUsd(pos, today) {
   return dx * (px.x ?? 0) + dy * (px.y ?? 0) + pos.feesUsd;
 }
 
+// Share of earned fees left after price-move costs: 1 = kept all fees, 0 = all eaten, < 0 = lost more than earned.
+// ponytail: undefined under $1 of fees; a cent of fees and a lucky exit would otherwise read as 900%.
+export const MIN_FEES_USD = 1;
+export const feesKept = (lpResult, fees) => (fees >= MIN_FEES_USD ? lpResult / fees : undefined);
+
 // pools: [{ address, name, today: {x, y}, positions: [...] }] → per-pool rows, best first, plus totals.
+// PnL in dollars splits into the market (what holding the same tokens would have done) and liquidity (vsHodl).
 export function summarize(pools) {
   const rows = pools.map(p => {
     const sum = f => p.positions.reduce((s, q) => s + f(q), 0);
@@ -36,11 +42,17 @@ export function summarize(pools) {
       feesUsd: sum(q => q.feesUsd), depositedUsd: sum(q => q.depositedUsd), pnlUsd: sum(q => q.pnlUsd),
       priced: !open || (p.today.x !== undefined && p.today.y !== undefined),
     };
-  }).filter(r => r.depositedUsd > 0).sort((a, b) => b.vsHodl - a.vsHodl);
+  }).filter(r => r.depositedUsd > 0)
+    .map(r => ({ ...r, feesKept: feesKept(r.vsHodl, r.feesUsd) }))
+    .sort((a, b) => b.vsHodl - a.vsHodl);
   const total = k => rows.reduce((s, r) => s + r[k], 0);
+  const vsHodl = total('vsHodl'), feesUsd = total('feesUsd'), pnlUsd = total('pnlUsd');
   return {
     rows,
-    vsHodl: total('vsHodl'), feesUsd: total('feesUsd'), depositedUsd: total('depositedUsd'), pnlUsd: total('pnlUsd'),
+    vsHodl, feesUsd, pnlUsd, depositedUsd: total('depositedUsd'),
+    marketUsd: pnlUsd - vsHodl,
+    priceCostUsd: vsHodl - feesUsd,
+    feesKept: feesKept(vsHodl, feesUsd),
     unpriced: rows.filter(r => !r.priced).length,
   };
 }
