@@ -1,9 +1,7 @@
-import { num, summarize } from './calc.js';
+import { report, DAYS } from './meteora.js';
+import { usd, signed, pct, tone } from './format.js';
 
-const API = 'https://dlmm.datapi.meteora.ag';
 const WALLET = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
-const DAYS = 365;
-const PARALLEL = 8; // Meteora allows 30 requests/s
 const EXAMPLE = 'Abaqj8ivq6Uoinc9CQiiZ9GQNDB2RFSWqhpJKf9mN6Gu'; // an active public Meteora LP wallet
 const BACKEND = location.hostname === 'localhost' ? 'http://127.0.0.1:8788' : 'https://api.shouldaheld.com';
 const params = new URLSearchParams(location.search);
@@ -16,75 +14,11 @@ const track = (type, data = {}) => fetch(`${BACKEND}/event`, {
 }).catch(() => {});
 
 const $ = id => document.getElementById(id);
-const usd = v => (v < 0 ? '−' : '') + '$' + Math.abs(v).toLocaleString('en-US', { maximumFractionDigits: Math.abs(v) < 100 ? 2 : 0 });
-const signed = v => (v >= 0 ? '+' : '') + usd(v);
-const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-async function get(url, retries = 2) {
-  const r = await fetch(url);
-  if (r.status === 429 && retries) { await sleep(1000); return get(url, retries - 1); }
-  if (!r.ok) throw new Error(`Meteora API ${r.status}`);
-  return r.json();
-}
 
-async function mapLimited(items, n, f) {
-  const out = [];
-  let next = 0;
-  await Promise.all(Array.from({ length: n }, async () => {
-    while (next < items.length) { const i = next++; out[i] = await f(items[i]); }
-  }));
-  return out;
-}
 
-async function poolList(path) {
-  const out = [];
-  for (let page = 1; ; page++) {
-    const d = await get(`${API}${path}&page=${page}&page_size=50`);
-    out.push(...d.pools);
-    if (!d.hasNext) return out;
-  }
-}
 
-const toPosition = q => ({
-  open: !q.isClosed, createdAt: q.createdAt, closedAt: q.closedAt, minPrice: num(q.minPrice), maxPrice: num(q.maxPrice),
-  deposited: { x: num(q.allTimeDeposits.tokenX.amount), y: num(q.allTimeDeposits.tokenY.amount) },
-  withdrawn: { x: num(q.allTimeWithdrawals.tokenX.amount), y: num(q.allTimeWithdrawals.tokenY.amount) },
-  withdrawnUsd: { x: num(q.allTimeWithdrawals.tokenX.usd), y: num(q.allTimeWithdrawals.tokenY.usd) },
-  balance: { x: num(q.unrealizedPnl?.balanceTokenX.amount), y: num(q.unrealizedPnl?.balanceTokenY.amount) },
-  depositedUsd: num(q.allTimeDeposits.total.usd),
-  feesUsd: num(q.allTimeFees.total.usd) + num(q.unrealizedPnl?.unclaimedFeeTokenX.usd) + num(q.unrealizedPnl?.unclaimedFeeTokenY.usd),
-  pnlUsd: num(q.pnlUsd),
-});
 
-async function pool(address, name, user) {
-  const positions = [];
-  let d;
-  for (let page = 1; ; page++) {
-    d = await get(`${API}/positions/${address}/pnl?user=${user}&status=all&page=${page}&page_size=100`);
-    positions.push(...d.positions.map(toPosition));
-    if (!d.hasNext) break;
-  }
-  const price = v => num(v) || undefined; // "0" means no price
-  return { address, name, today: { x: price(d.tokenXPrice), y: price(d.tokenYPrice) }, positions };
-}
-
-async function report(user, progress) {
-  const [closed, open] = await Promise.all([
-    poolList(`/portfolio?user=${user}&days_back=${DAYS}`),
-    poolList(`/portfolio/open?user=${user}`),
-  ]);
-  const names = new Map([...closed, ...open].map(p => [p.poolAddress, `${p.tokenX}-${p.tokenY}`]));
-  let done = 0;
-  const pools = await mapLimited([...names], PARALLEL, async ([address, name]) => {
-    const p = await pool(address, name, user);
-    progress(++done, names.size);
-    return p;
-  });
-  return summarize(pools, Date.now() / 1000 - DAYS * 86400);
-}
-
-const pct = k => (k === undefined ? '—' : `${Math.round(k * 100)}%`);
-const tone = v => (v >= 0 ? 'good' : 'bad');
 
 function verdict(s) {
   if (!s.rows.length) return 'No Meteora DLMM positions found for this wallet in the last 365 days.';
@@ -96,7 +30,17 @@ function verdict(s) {
   return 'Price moves cost you more than your fees. Shoulda held.';
 }
 
-function render(s, user) {
+// Ranked LPs from the daily crawl, for "better than X% of LPs". Missing file → no benchmark.
+const board = fetch('data/leaderboard.json', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : null)).catch(() => null);
+
+function benchmark(s, b) {
+  if (!b?.wallets.length || s.feesKept === undefined) return null;
+  const kept = b.wallets.map(w => w.k).sort((x, y) => x - y);
+  return { beat: kept.filter(k => k < s.feesKept).length / kept.length, n: kept.length, top: kept[Math.floor(0.9 * kept.length)] };
+}
+
+function render(s, user, b) {
+  const bench = benchmark(s, b);
   const set = (id, v, cls = '') => { $(id).textContent = v; $(id).className = cls; };
   $('verdict').textContent = verdict(s);
   $('full').hidden = !s.rows.length;
@@ -112,6 +56,11 @@ function render(s, user) {
     `${s.openPositions ? ` (${s.openPositions} open)` : ''}<br>closed since ${since} · ${usd(s.depositedUsd)} deposited`;
   $('unpriced').hidden = !s.unpriced;
   $('unpriced').textContent = `${s.unpriced} open pool(s) hold tokens with no current price; those tokens count as $0.`;
+  $('bench').hidden = !bench;
+  if (bench) {
+    $('bench-beat').textContent = pct(bench.beat);
+    $('bench-text').textContent = `of ${bench.n.toLocaleString('en-US')} Meteora LPs we track kept a smaller share of their fees. The top 10% keep ${pct(bench.top)} or more.`;
+  }
 
   const tr = r => `<tr><td>${r.name}${r.open ? ' <span class="tag">open</span>' : ''}</td>` +
     `<td class="${tone(r.feesKept ?? r.vsHodl)}">${pct(r.feesKept)}</td><td class="${tone(r.vsHodl)}">${signed(r.vsHodl)}</td><td>${usd(r.feesUsd)}</td></tr>`;
@@ -122,9 +71,9 @@ function render(s, user) {
   lastResult = { wallet: user, feesKept: s.feesKept, feesUsd: s.feesUsd, lpUsd: s.vsHodl, depositedUsd: s.depositedUsd };
   shareText = s.feesKept === undefined
     ? `Liquidity earned me ${signed(s.vsHodl)} after price moves. Get your receipt from @shouldaheld`
-    : `I kept ${pct(s.feesKept)} of my LP fees after price moves: ${signed(s.vsHodl)} from liquidity, the rest of my PnL was the market. ${s.feesKept >= 0.5 ? 'Not bad.' : s.feesKept >= 0 ? 'Could be worse.' : 'Shoulda held.'} Get your receipt from @shouldaheld`;
+    : `I kept ${pct(s.feesKept)} of my LP fees after price moves: ${signed(s.vsHodl)} from liquidity, the rest of my PnL was the market. ${bench ? `Better than ${pct(bench.beat)} of LPs.` : s.feesKept >= 0.5 ? 'Not bad.' : s.feesKept >= 0 ? 'Could be worse.' : 'Shoulda held.'} Get your receipt from @shouldaheld`;
   $('share-x').href = intent(`${location.origin}${location.pathname}?wallet=${user}`); // fallback if the card upload fails
-  drawCard(s);
+  drawCard(s, bench);
   renderWaitlist(s);
   $('shared').hidden = !(REF && user === params.get('wallet'));
   $('intro').hidden = true;
@@ -185,7 +134,7 @@ async function joinWaitlist(e) {
 }
 
 // Share card for X, 1200×630.
-function drawCard(s) {
+function drawCard(s, bench) {
   const c = $('card'), g = c.getContext('2d');
   const measured = s.feesKept !== undefined;
   const good = (s.feesKept ?? s.vsHodl) >= 0;
@@ -196,6 +145,7 @@ function drawCard(s) {
   g.fillText(measured ? pct(s.feesKept) : signed(s.vsHodl), 80, 320);
   g.fillStyle = '#e6edf3'; g.font = '400 34px system-ui, sans-serif';
   g.fillText(`From liquidity ${signed(s.vsHodl)} · fees ${usd(s.feesUsd)} · market ${signed(s.marketUsd)}`, 80, 410);
+  if (bench) { g.fillStyle = '#58a6ff'; g.font = '600 34px system-ui, sans-serif'; g.fillText(`Better than ${pct(bench.beat)} of Meteora LPs`, 80, 470); }
   g.fillStyle = '#8b949e'; g.font = '400 26px system-ui, sans-serif';
   g.fillText('Shoulda held? Get your receipt · @shouldaheld', 80, 550);
 }
@@ -209,7 +159,7 @@ async function run(user) {
     const started = Date.now();
     let found = 0;
     const s = await report(user, (done, total) => { found = total; $('go').textContent = `Reading pool ${done} of ${total}…`; });
-    render(s, user);
+    render(s, user, await board);
     track('check', {
       wallet: user, feesKept: s.feesKept, feesUsd: s.feesUsd, pools: s.rows.length,
       meta: {

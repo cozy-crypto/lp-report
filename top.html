@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LP Leaderboard — Shoulda Held?</title>
+<meta name="description" content="Which Solana liquidity providers actually keep their fees after price moves, and which pools eat them. Updated daily from public Meteora data.">
+<link rel="icon" href="img/raccoon.png">
+<link rel="stylesheet" href="style.css">
+<style>
+  .board-hero { padding: 32px 0 8px; max-width: 760px; }
+  .board-hero h1 { font-size: 44px; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 28px 0 8px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .stat b { display: block; font-size: 28px; font-variant-numeric: tabular-nums; }
+  .stat span { color: var(--muted); font-size: 14px; }
+  .bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin: 32px 0 4px; }
+  .tabs, .sizes { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tabs button, .sizes button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; font-size: 15px; font-weight: 500; }
+  .tabs button[aria-pressed="true"], .sizes button[aria-pressed="true"] { border-color: var(--accent); background: rgba(88, 166, 255, .12); }
+  .sizes button { padding: 6px 12px; font-size: 14px; }
+  .board { overflow-x: auto; }
+  .board table { font-variant-numeric: tabular-nums; }
+  .board td:first-child { color: var(--muted); width: 2.5em; }
+  .board td.who { text-align: left; } .board th.who { text-align: left; }
+  .board .pools { color: var(--muted); font-size: 13px; text-align: left; white-space: normal; min-width: 12em; }
+  .mono { font-family: var(--mono); }
+  .note { margin: 12px 0 0; }
+  .cta { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px 24px; margin: 40px 0 48px; }
+  .cta h2 { margin: 0; font-size: 22px; }
+  @media (max-width: 760px) {
+    .stats { grid-template-columns: 1fr 1fr; }
+    .board-hero h1 { font-size: 32px; }
+    .board .pools, .board th.pools { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="./"><img src="img/raccoon.png" alt="" width="36" height="36">Shoulda Held?</a>
+    <nav><a class="xlink" href="./">Get your receipt</a><a class="xlink" href="https://x.com/shouldaheld" target="_blank" rel="noopener">@shouldaheld</a></nav>
+  </header>
+
+  <section class="board-hero">
+    <span class="pill-label">LP leaderboard · updated daily</span>
+    <h1>Who actually keeps their LP fees?</h1>
+    <p class="lead" id="lead">Liquidity providers on Meteora, ranked by the share of fees they kept after price moves over the last 365 days.</p>
+  </section>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="bar">
+    <div class="tabs" role="group" aria-label="Board">
+      <button type="button" data-tab="fame" aria-pressed="true">Kept the most</button>
+      <button type="button" data-tab="shame" aria-pressed="false">Shoulda held</button>
+      <button type="button" data-tab="pools" aria-pressed="false">Pools</button>
+    </div>
+    <div class="sizes" role="group" aria-label="Deposit size" id="sizes">
+      <button type="button" data-min="0" aria-pressed="true">All sizes</button>
+      <button type="button" data-min="10000" aria-pressed="false">$10k+</button>
+      <button type="button" data-min="100000" aria-pressed="false">$100k+</button>
+    </div>
+  </div>
+  <div class="board"><table><thead id="head"></thead><tbody id="body"></tbody></table></div>
+  <p class="muted small note" id="note"></p>
+
+  <div class="cta">
+    <h2>Where would you rank?</h2>
+    <a class="btn" href="./">Get your receipt</a>
+  </div>
+
+  <details>
+    <summary>How is this ranked?</summary>
+    <p>Every day we take the Meteora DLMM pools with the most fees in the last 24 hours (TVL over $100k), find the wallets with open positions there, and build each wallet's receipt for the last 365 days, the same way as on the main page.</p>
+    <p><b>Fees kept</b> is what liquidity earned after price moves, divided by the fees earned. 100%: price moves cost nothing. Below 0%: holding the tokens would have done better. Wallets with less than $100 of fees, less than $1,000 deposited, or fees under 0.25% of what they put in are left out (there the ratio is mostly noise), and so are wallets in more than 300 pools (mostly bots).</p>
+    <p><b>Pools</b> show, among the LPs we saw in each pool, how many beat holding and the share of fees the typical (median) LP kept. These are public on-chain positions; this is not a recommendation to copy anyone or to use any pool.</p>
+  </details>
+
+  <footer>
+    Data from the public Meteora API. Read-only and free. Not financial advice. Not affiliated with Meteora.
+    <a href="https://x.com/shouldaheld" target="_blank" rel="noopener">@shouldaheld</a> · <a href="terms.html">Terms and privacy</a>
+  </footer>
+</div>
+<script type="module" src="top.js"></script>
+</body>
+</html>

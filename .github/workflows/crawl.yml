@@ -1,0 +1,27 @@
+# Rebuilds data/leaderboard.json every day and commits it; GitHub Pages then serves it with the site.
+name: Leaderboard crawl
+on:
+  schedule:
+    - cron: '17 3 * * *'   # 03:17 UTC daily
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: crawl
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 200
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node calc.test.mjs
+      - run: node crawl/crawl.mjs
+      - name: Commit the new leaderboard
+        run: |
+          git config user.name "shouldaheld-bot"
+          git config user.email "hello@shouldaheld.com"
+          git add data/leaderboard.json
+          git diff --cached --quiet || git commit -m "Leaderboard $(date -u +%F)"
+          git push
