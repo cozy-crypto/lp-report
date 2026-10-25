@@ -59,41 +59,52 @@ button:disabled { opacity: .6; cursor: wait; }
 .hero.compact h1 { font-size: 30px; } .hero.compact .lead, .hero.compact .pill-label { display: none; }
 
 /* Result */
-#result { padding: 8px 0 56px; }
-.shared { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--accent); border-radius: 12px; padding: 12px 16px; margin-bottom: 24px; }
-#verdict { font-size: 26px; font-weight: 700; line-height: 1.25; margin: 0 0 20px; }
-#scope, #unpriced { margin: 22px 0 0; }
-.owner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: -6px 0 20px; color: var(--muted); }
-.owner .btn { padding: 8px 14px; font-size: 15px; }
-.verify { display: flex; gap: 12px 16px; align-items: center; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--good); border-radius: 12px; padding: 14px 16px; margin: -6px 0 20px; }
-.verify > div { flex: 1 1 300px; }
-.verify p { margin: 0; flex-basis: 100%; } .verify p:empty { display: none; }
+
+/* Result: receipt on the left, one action panel on the right; on phones the panel goes under the receipt.
+   Blocks change their content in place, they don't appear above the receipt, so nothing jumps. */
+#result { max-width: 1000px; margin: 0 auto; padding: 8px 0 48px; }
+.shared { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--accent); border-radius: 12px; padding: 12px 16px; margin-bottom: 20px; }
+.result-grid { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 40px; align-items: start; }
+.result-receipt { position: sticky; top: 16px; }
+#unpriced { margin: 20px 0 0; }
+.rank-line { text-align: center; font-size: 13px; color: var(--ink-muted); margin-top: 10px; }
+.rank-line a { color: var(--ink); }
 .verified-stamp { text-align: center; color: var(--ink-good); font-weight: 700; font-size: 13px; letter-spacing: .1em; margin: -2px 0 6px; }
 .badge-ok { color: var(--good); margin-left: 4px; }
-.wl-verify { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: -6px 0 18px; }
-.wl-verify .btn { padding: 8px 14px; font-size: 15px; }
-.bench { display: flex; gap: 16px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; margin: 28px 0 0; }
-.bench b { font-size: 36px; color: var(--accent); font-variant-numeric: tabular-nums; }
-.bench p { margin: 0; color: var(--muted); }
-.actions { display: flex; gap: 10px; flex-wrap: wrap; margin: 24px 0 0; }
-.actions .btn { flex: 1 1 200px; }
-
-.waitlist { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 24px; margin: 40px 0 0; }
-.waitlist h2 { font-size: 22px; line-height: 1.3; margin: 0 0 6px; }
-.waitlist > p { margin: 0 0 18px; }
-.roles { display: flex; flex-wrap: wrap; gap: 8px; border: 0; padding: 0; margin: 0 0 16px; }
-.roles legend { padding: 0; margin-bottom: 8px; font-size: 14px; color: var(--muted); }
-.choice { position: relative; border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; cursor: pointer; font-size: 15px; }
-.choice input { position: absolute; opacity: 0; pointer-events: none; }
-.choice:has(input:checked) { border-color: var(--accent); background: rgba(88, 166, 255, .12); }
-.choice:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
-.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.fields input { min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; padding: 12px; }
-.fields input:focus { outline: none; border-color: var(--accent); }
-.fields button { grid-column: 1 / -1; }
+.good-text { color: var(--good); }
+#verdict { font-size: 28px; line-height: 1.2; margin: 4px 0 14px; }
+.owner { min-height: 44px; margin-bottom: 18px; }
+#owner-ask { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.small-btn { padding: 8px 14px; font-size: 15px; }
+.link-btn { background: none; border: 0; padding: 0; color: var(--muted); font: inherit; text-decoration: underline; cursor: pointer; }
+#owner-status .link-btn { font-size: 14px; }
+.owner p { margin: 6px 0 0; } .owner p:empty { display: none; }
+.err-text { color: var(--bad); margin: 6px 0 0; }
+.actions { display: flex; gap: 10px; }
+.actions .btn:first-child { flex: 2; } .actions .btn { flex: 1; }
+.duel { border: 0; padding: 12px 0 0; }
+.duel summary { font-weight: 500; color: var(--accent); }
+#duel-form { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+#duel-form input, .wl-row input { flex: 1 1 160px; min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; padding: 11px 12px; }
+#duel-form input:focus, .wl-row input:focus { outline: none; border-color: var(--accent); }
+.duel table td:first-child { color: var(--muted); }
+.duel-verdict { font-weight: 700; margin: 12px 0; }
+.waitlist { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin: 24px 0 0; }
+.waitlist h3 { font-size: 18px; line-height: 1.3; margin: 0 0 4px; }
+.waitlist > p { margin: 0 0 12px; }
+.wl-row { display: flex; gap: 8px; }
+.wl-row input#wl-link { font: 13px var(--mono); }
 .hp { position: absolute; left: -9999px; width: 1px; height: 1px; }
-#wl-msg { min-height: 24px; margin: 10px 0 0; } #wl-msg.err { color: var(--bad); } #wl-msg.ok { color: var(--good); }
-.fine { font-size: 13px; color: var(--muted); margin: 6px 0 0; }
+#wl-msg { margin: 8px 0 0; } #wl-msg:empty { display: none; } #wl-msg.err { color: var(--bad); }
+.wl-done .place { margin: 0 0 10px; }
+.wl-done .place b { font-size: 32px; color: var(--accent); font-variant-numeric: tabular-nums; }
+.wl-done p { margin: 10px 0 0; }
+.fine { font-size: 12px; color: var(--muted); margin: 10px 0 0 !important; }
+.pools-details { margin-top: 40px; }
+#card, #duel-card { display: none; }
+/* A wallet with no positions: just the verdict and the waitlist */
+#result.empty .result-receipt, #result.empty .actions, #result.empty .duel, #result.empty .pools-details { display: none; }
+#result.empty .result-grid { grid-template-columns: 1fr; max-width: 640px; margin: 0 auto; }
 
 details { border-top: 1px solid var(--line); padding: 16px 0; }
 details:last-of-type { border-bottom: 1px solid var(--line); }
@@ -105,25 +116,15 @@ th { color: var(--muted); font-weight: 500; }
 td:not(:first-child), th:not(:first-child) { text-align: right; white-space: nowrap; }
 td.good { color: var(--good); } td.bad { color: var(--bad); }
 .tag { font-size: 12px; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0 4px; }
-#card, #duel-card { display: none; }
-.duel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 24px; margin: 40px 0 0; }
-.duel h2 { font-size: 22px; margin: 0 0 14px; }
-.duel input { min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; padding: 12px; }
-.duel input:focus { outline: none; border-color: var(--accent); }
-.duel table td:first-child { color: var(--muted); }
-.duel-verdict { font-weight: 700; font-size: 18px; margin: 16px 0; }
-.err-text { color: var(--bad); min-height: 20px; margin: 8px 0 0; }
-.wl-done .place { margin: 0 0 4px; }
-.wl-done .place b { font-size: 40px; color: var(--accent); font-variant-numeric: tabular-nums; }
-.wl-done .ref { display: flex; gap: 8px; margin: 14px 0 12px; }
-.wl-done .ref input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: 14px var(--mono); padding: 10px; }
-.wl-done > .btn { width: 100%; }
 
 .more { padding: 0 0 24px; }
+.more.narrow { max-width: 1000px; } /* lines up with the result above */
 footer { border-top: 1px solid var(--line); padding: 24px 0 40px; font-size: 13px; color: var(--muted); }
 footer a { color: var(--muted); }
 
 @media (max-width: 860px) {
+  .result-grid { grid-template-columns: 1fr; gap: 24px; }
+  .result-receipt { position: static; max-width: 460px; width: 100%; margin: 0 auto; }
   .hero { grid-template-columns: 1fr; gap: 40px; padding: 24px 0 48px; }
   h1 { font-size: 36px; }
   .lead { font-size: 17px; }
@@ -132,7 +133,6 @@ footer a { color: var(--muted); }
 @media (max-width: 520px) {
   header nav .xlink + .xlink { display: none; } /* phones: keep one nav link next to the logo */
   #form { flex-direction: column; }
-  .fields { grid-template-columns: 1fr; }
   #verdict { font-size: 22px; }
-  .waitlist { padding: 20px 16px; }
+  .waitlist { padding: 16px; }
 }
