@@ -41,6 +41,14 @@
   .tag { font-size: 12px; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0 4px; }
   canvas { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--line); margin: 24px 0 12px; }
   .share { display: flex; gap: 8px; flex-wrap: wrap; }
+  .waitlist { background: var(--panel); border: 1px solid var(--accent); border-radius: 8px; padding: 4px 16px 8px; margin: 24px 0; }
+  .waitlist h2 { margin: 16px 0 4px; font-size: 20px; }
+  .roles { border: 0; padding: 0; margin: 12px 0; } .roles legend { padding: 0; margin-bottom: 4px; }
+  .roles label { display: block; padding: 4px 0; cursor: pointer; }
+  .roles input { flex: none; padding: 0; margin: 0 8px 0 0; accent-color: var(--accent); }
+  .fields { display: flex; gap: 8px; flex-wrap: wrap; } .fields input { min-width: 180px; }
+  .hp { position: absolute; left: -9999px; }
+  #wl-msg { min-height: 24px; margin: 8px 0 0; } #wl-msg.err { color: var(--bad); } #wl-msg.ok { color: var(--good); }
   details { margin-top: 32px; color: var(--muted); }
   footer { margin-top: 48px; font-size: 13px; color: var(--muted); }
   footer a { color: var(--muted); }
@@ -91,6 +99,25 @@
     </div>
     <p class="muted" id="scope"></p>
     <p id="unpriced" class="muted" hidden></p>
+
+    <form id="waitlist" class="waitlist" novalidate>
+      <h2 id="wl-title"></h2>
+      <p class="muted" id="wl-text"></p>
+      <fieldset class="roles">
+        <legend class="muted small">I'm interested in</legend>
+        <label><input type="radio" name="role" value="copy"> Copying LPs who keep their fees</label>
+        <label><input type="radio" name="role" value="lead"> Getting paid when others copy me</label>
+        <label><input type="radio" name="role" value="curious"> Just curious</label>
+      </fieldset>
+      <div class="fields">
+        <input id="wl-email" type="email" placeholder="you@example.com" autocomplete="email" aria-label="Email">
+        <input id="wl-x" placeholder="@handle on X (optional)" autocomplete="off" aria-label="X handle">
+        <input id="wl-website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <button id="wl-go">Join the waitlist</button>
+      </div>
+      <p id="wl-msg" role="status"></p>
+      <p class="muted small">Used only to tell you when copying opens. We keep your email or handle, your choice above, and this wallet's result. Delete anytime: <a href="mailto:hello@shouldaheld.com">hello@shouldaheld.com</a> · <a href="terms.html#privacy">Privacy</a></p>
+    </form>
 
     <table>
       <thead><tr><th>Pool</th><th>Fees kept</th><th>From liquidity</th><th>Fees</th></tr></thead>

@@ -4,6 +4,8 @@ const API = 'https://dlmm.datapi.meteora.ag';
 const WALLET = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const PARALLEL = 8; // Meteora allows 30 requests/s
 const EXAMPLE = 'Abaqj8ivq6Uoinc9CQiiZ9GQNDB2RFSWqhpJKf9mN6Gu'; // an active public Meteora LP wallet
+const WAITLIST = location.hostname === 'localhost' ? 'http://127.0.0.1:8788/waitlist' : 'https://api.shouldaheld.com/waitlist';
+let lastResult = {}; // wallet and result sent along with a waitlist signup
 
 const $ = id => document.getElementById(id);
 const usd = v => (v < 0 ? '−' : '') + '$' + Math.abs(v).toLocaleString('en-US', { maximumFractionDigits: Math.abs(v) < 100 ? 2 : 0 });
@@ -113,8 +115,43 @@ function render(s, user) {
     : `I kept ${pct(s.feesKept)} of my LP fees after price moves: ${signed(s.vsHodl)} from liquidity, the rest of my PnL was the market. ${s.feesKept >= 0.5 ? 'Not bad.' : s.feesKept >= 0 ? 'Could be worse.' : 'Shoulda held.'} Get your receipt from @shouldaheld`;
   $('share-x').href = `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(link)}`;
   drawCard(s);
+  renderWaitlist(s, user);
   $('intro').hidden = true;
   $('result').hidden = false;
+}
+
+// Strong LPs are pitched the leader side, everyone else the copying side.
+function renderWaitlist(s, user) {
+  const lead = s.feesKept >= 0.5;
+  lastResult = { wallet: user, feesKept: s.feesKept, feesUsd: s.feesUsd };
+  $('wl-title').textContent = lead ? 'You kept most of your fees. Want to get paid for it?' : 'Want to copy LPs who keep their fees?';
+  $('wl-text').textContent = lead
+    ? "We're building copy-LP: others follow your positions automatically, and you earn a share of the fees they make."
+    : "We're building copy-LP: follow the positions of liquidity providers with the best results, automatically, in your own wallet.";
+  document.querySelector(`#waitlist input[value="${lead ? 'lead' : 'copy'}"]`).checked = true;
+  $('wl-msg').textContent = ''; $('wl-msg').className = '';
+}
+
+async function joinWaitlist(e) {
+  e.preventDefault();
+  const msg = (text, cls) => { $('wl-msg').textContent = text; $('wl-msg').className = cls; };
+  const email = $('wl-email').value.trim(), x = $('wl-x').value.trim();
+  if (!email && !x) return msg('Add an email or an X handle.', 'err');
+  $('wl-go').disabled = true;
+  try {
+    const r = await fetch(WAITLIST, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, x, role: new FormData($('waitlist')).get('role'), website: $('wl-website').value, ...lastResult }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || 'Something went wrong');
+    msg("You're on the list. We'll reach out when copying opens.", 'ok');
+  } catch (err) {
+    msg(`${err.message}. Try again.`, 'err');
+  } finally {
+    $('wl-go').disabled = false;
+  }
 }
 
 // Share card for X, 1200×630.
@@ -148,6 +185,7 @@ async function run(user) {
 }
 
 $('form').addEventListener('submit', e => { e.preventDefault(); run($('wallet').value.trim()); });
+$('waitlist').addEventListener('submit', joinWaitlist);
 $('example').addEventListener('click', e => {
   e.preventDefault();
   $('wallet').value = EXAMPLE;
