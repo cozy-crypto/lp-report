@@ -120,8 +120,33 @@ function setOwner(me) {
 // Must match verifyMessage() in api/verify.js character for character.
 const verifyMessage = (wallet, issuedAt) => 'shouldaheld.com wants you to prove you own this Solana wallet.\n\n'
   + `Wallet: ${wallet}\nIssued at: ${issuedAt}\n\nSigning is free. It does not send a transaction or give access to your funds.`;
-const walletApp = () => [['phantom', window.phantom?.solana], ['solflare', window.solflare], ['backpack', window.backpack], ['solana', window.solana]]
-  .find(([, p]) => p?.signMessage);
+// Wallets announce themselves through the Wallet Standard (current Phantom, Solflare, Backpack…);
+// older ones only inject a global. Both are turned into { name, connect(): address, sign(bytes): signature }.
+const standardWallets = [];
+const register = (...ws) => standardWallets.push(...ws);
+window.addEventListener('wallet-standard:register-wallet', e => e.detail?.({ register }));
+window.dispatchEvent(new CustomEvent('wallet-standard:app-ready', { detail: { register } }));
+
+function walletApp() {
+  const std = standardWallets.find(w => w.features?.['solana:signMessage'] && w.features?.['standard:connect']);
+  if (std) {
+    let account;
+    return {
+      name: std.name,
+      connect: async () => { account = (await std.features['standard:connect'].connect()).accounts?.[0] ?? std.accounts?.[0]; return account?.address; },
+      sign: async bytes => (await std.features['solana:signMessage'].signMessage({ account, message: bytes }))[0].signature,
+    };
+  }
+  const found = [['phantom', window.phantom?.solana], ['solflare', window.solflare], ['backpack', window.backpack], ['solana', window.solana]]
+    .find(([, p]) => p?.signMessage);
+  if (!found) return null;
+  const [name, p] = found;
+  return {
+    name,
+    connect: async () => ((await p.connect())?.publicKey ?? p.publicKey)?.toString(),
+    sign: async bytes => { const res = await p.signMessage(bytes, 'utf8'); return res?.signature ?? res; },
+  };
+}
 
 // Sign a plain message with the wallet app (no transaction) and let the server check it against the address.
 async function verifyOwnership() {
@@ -133,18 +158,16 @@ async function verifyOwnership() {
     $('verify-apps').innerHTML = matchMedia('(max-width: 640px)').matches
       ? `Open this page in your wallet app: <a href="https://phantom.app/ul/browse/${here}?ref=${ref}">Phantom</a> · <a href="https://solflare.com/ul/v1/browse/${here}?ref=${ref}">Solflare</a>`
       : 'No Solana wallet found in this browser. Install <a href="https://phantom.app" target="_blank" rel="noopener">Phantom</a> or <a href="https://solflare.com" target="_blank" rel="noopener">Solflare</a> and reload.';
-    action('verify_no_wallet');
+    action('verify_no_wallet', { mobile: matchMedia('(max-width: 640px)').matches, ua: navigator.userAgent.slice(0, 120), globals: Object.keys(window).filter(k => /phantom|solana|solflare|backpack/i.test(k)).join(',') });
     return;
   }
-  const [app, provider] = found;
+  const app = found.name;
   $('verify-go').disabled = true; msg('');
   try {
-    const conn = await provider.connect();
-    const connected = (conn?.publicKey ?? provider.publicKey)?.toString();
+    const connected = await found.connect();
     if (connected !== wallet) throw new Error(`Your wallet app is on ${connected?.slice(0, 4)}…${connected?.slice(-4)}. Switch to ${wallet.slice(0, 4)}…${wallet.slice(-4)} and try again`);
     const issuedAt = new Date().toISOString();
-    const signed = await provider.signMessage(new TextEncoder().encode(verifyMessage(wallet, issuedAt)), 'utf8');
-    const sig = signed?.signature ?? signed;
+    const sig = await found.sign(new TextEncoder().encode(verifyMessage(wallet, issuedAt)));
     const r = await fetch(`${BACKEND}/verify`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ wallet, issuedAt, app, signature: btoa(String.fromCharCode(...new Uint8Array(sig))) }),
