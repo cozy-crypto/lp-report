@@ -5,7 +5,7 @@ const day = n => new Date(Date.now() - n * 864e5).toISOString();
 export async function buildStats(env) {
   const q = (sql, ...args) => env.DB.prepare(sql).bind(...args).all().then(r => r.results);
   const since30 = day(30), since7 = day(7);
-  const [daily, sources, campaigns, shares, cards, kept, sizes, waitlist, actions] = await Promise.all([
+  const [daily, sources, campaigns, shares, cards, kept, sizes, waitlist, actions, crawls] = await Promise.all([
     // One row per day: the whole funnel, including the sharing loop.
     q(`SELECT substr(created_at, 1, 10) AS date,
          sum(type = 'visit') AS visits,
@@ -47,11 +47,13 @@ export async function buildStats(env) {
          sum(referred_by IS NOT NULL) AS referred FROM waitlist`),
     q(`SELECT json_extract(meta, '$.name') AS action, count(*) AS n FROM events
        WHERE type = 'action' AND created_at >= ?1 GROUP BY action ORDER BY n DESC`, since7),
+    q(`SELECT date, pools, wallets_found AS walletsFound, crawled, ranked, skipped, failed, seconds FROM crawl_runs
+       ORDER BY date DESC LIMIT 7`),
   ]);
   return {
     generatedAt: new Date().toISOString(),
     notes: 'daily: last 30 days, newest first. sources, campaigns, shares, cards, actions: last 7 days. buckets: last 30 days, unique wallets. '
       + 'cardsPosted = share cards a platform fetched for a preview (the link was posted); postedOn lists where.',
-    daily, sources, campaigns, shares, cards, feesKeptBuckets: kept, depositBuckets: sizes, waitlist: waitlist[0], actions,
+    daily, sources, campaigns, shares, cards, feesKeptBuckets: kept, depositBuckets: sizes, waitlist: waitlist[0], actions, crawls,
   };
 }

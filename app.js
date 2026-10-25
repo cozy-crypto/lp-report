@@ -62,11 +62,14 @@ function render(s, user, b) {
   mine = s;
   const rank = topShare(bench);
   cardKind = rank ? 'rank' : 'receipt';
+  // Good results tag Meteora (they may repost wins on their pools); bad ones don't, nobody reposts a loss about themselves.
   shareText = rank
-    ? `Top ${rank} of Meteora LPs: I kept ${pct(s.feesKept)} of my LP fees after price moves (${signed(s.vsHodl)} from liquidity). Where do you rank? @shouldaheld`
+    ? `Kept ${pct(s.feesKept)} of my LP fees after price moves: top ${rank} of @MeteoraAG LPs.\n\nWhere do you rank? 🦝 via @shouldaheld`
     : s.feesKept === undefined
-    ? `Liquidity earned me ${signed(s.vsHodl)} after price moves. Get your receipt from @shouldaheld`
-    : `I kept ${pct(s.feesKept)} of my LP fees after price moves: ${signed(s.vsHodl)} from liquidity, the rest of my PnL was the market. ${bench ? `Better than ${pct(bench.beat)} of LPs.` : s.feesKept >= 0.5 ? 'Not bad.' : s.feesKept >= 0 ? 'Could be worse.' : 'Shoulda held.'} Get your receipt from @shouldaheld`;
+    ? `Liquidity earned me ${signed(s.vsHodl)} after price moves.\n\nGet your receipt 🦝 via @shouldaheld`
+    : s.feesKept >= 0.5
+    ? `I kept ${pct(s.feesKept)} of my @MeteoraAG LP fees after price moves (${signed(s.vsHodl)} from liquidity).\n\nHow much of yours did you keep? 🦝 via @shouldaheld`
+    : `My PnL said one thing. My LP receipt says I kept ${pct(s.feesKept)} of my fees after price moves. ${s.feesKept >= 0 ? 'Could be worse.' : 'Shoulda held.'}\n\nGet yours 🦝 via @shouldaheld`;
   $('share-x').href = intent(shareText, `${location.origin}${location.pathname}?wallet=${user}`); // fallback if the card upload fails
   $('duel-result').hidden = true;
   drawCard(s, bench);
@@ -123,7 +126,7 @@ async function runDuel(e) {
       + row('Deposited', mine.depositedUsd, them.depositedUsd, usd);
     $('duel-verdict').textContent = win === 'tie' ? 'A tie.' : win === 'me' ? 'You kept more of your fees.' : `${name} kept more of their fees.`;
     duelText = `My LP receipt vs ${name}: I kept ${pct(mine.feesKept)} of my fees after price moves, ${handle ? 'they' : 'this wallet'} kept ${pct(them.feesKept)}. `
-      + `${win === 'me' ? 'Shoulda held? Not me.' : win === 'them' ? 'Fine. You win this one.' : 'Dead even.'} Compare yours: @shouldaheld`;
+      + `${win === 'me' ? 'Shoulda held? Not me.' : win === 'them' ? 'Fine. You win this one.' : 'Dead even.'} \n\nCompare yours 🦝 via @shouldaheld`;
     drawDuel(mine, them, name, win);
     $('duel-result').hidden = false;
     action('duel', { win, handle: !!handle });

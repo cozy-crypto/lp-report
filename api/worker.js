@@ -1,5 +1,6 @@
 // One Worker for shouldaheld.com on three hostnames:
-//   api.shouldaheld.com    POST /waitlist, POST /event, POST /card, GET /stats (for the agent farm, needs STATS_KEY)
+//   api.shouldaheld.com    POST /waitlist, POST /event, POST /card, GET /stats (for the agent farm, needs STATS_KEY),
+//                          POST /crawl (daily crawl history, needs CRAWL_KEY)
 //   r.shouldaheld.com      /<id> share page for X, /<id>.png its card image
 //   admin.shouldaheld.com  funnel and leads, behind Cloudflare Access
 // The last two also answer at /r/ and /admin on any host (that's how `wrangler dev` reaches them);
@@ -7,6 +8,7 @@
 import { admin } from './admin.js';
 import { saveCard, sharePage, cardImage } from './share.js';
 import { buildStats } from './stats.js';
+import { saveCrawl } from './crawl.js';
 import { SITE, WALLET, num, now, hashWallet } from './util.js';
 
 const ORIGINS = [SITE, 'http://localhost:8787'];
@@ -41,6 +43,10 @@ export default {
     if (req.method === 'POST' && url.pathname === '/waitlist') return waitlist(req, env, json);
     if (req.method === 'POST' && url.pathname === '/event') return event(req, env, json);
     if (req.method === 'POST' && url.pathname === '/card') return saveCard(req, env, json, SHARE_BASE);
+    if (req.method === 'POST' && url.pathname === '/crawl') {
+      if (!env.CRAWL_KEY || req.headers.get('Authorization') !== `Bearer ${env.CRAWL_KEY}`) return json({ error: 'Forbidden' }, 403);
+      return saveCrawl(req, env, json);
+    }
     if (req.method === 'GET' && url.pathname === '/stats') {
       const key = req.headers.get('Authorization')?.replace(/^Bearer /, '') ?? url.searchParams.get('key');
       if (!env.STATS_KEY || key !== env.STATS_KEY) return json({ error: 'Forbidden' }, 403);

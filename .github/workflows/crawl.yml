@@ -18,6 +18,8 @@ jobs:
           node-version: 22
       - run: node calc.test.mjs
       - run: node crawl/crawl.mjs
+        env:
+          CRAWL_KEY: ${{ secrets.CRAWL_KEY }}   # same value as the Worker's CRAWL_KEY secret
       - name: Commit the new leaderboard
         run: |
           git config user.name "shouldaheld-bot"

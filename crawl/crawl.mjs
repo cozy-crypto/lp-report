@@ -63,13 +63,13 @@ const results = await mapLimited(wallets, 5, async w => {
   if (Date.now() - started > BUDGET_MIN * 60e3) return null;
   try {
     const s = await report(w, undefined, { parallel: 3, maxPools: MAX_POOLS });
-    if (!s) skipped++;
-    return s && { w, s };
-  } catch (e) { failed++; fails[e.message] = (fails[e.message] ?? 0) + 1; return null; }
+    if (!s) { skipped++; return { w, status: 'skipped' }; }
+    return { w, s, status: 'ok' };
+  } catch (e) { failed++; fails[e.message] = (fails[e.message] ?? 0) + 1; return { w, status: 'failed', error: e.message }; }
   finally { if (++done % 50 === 0) console.log(`${done}/${wallets.length} ${Math.round((Date.now() - started) / 1000)}s`); }
 });
 
-const ok = results.filter(Boolean);
+const ok = results.filter(x => x?.s);
 const ranked = ok.filter(({ s }) => s.feesKept !== undefined && s.feesUsd >= RANK_FEES && s.depositedUsd >= RANK_DEPOSIT
     && s.feesUsd >= RANK_FEE_YIELD * s.depositedUsd)
   .map(({ w, s }) => ({
@@ -96,4 +96,29 @@ writeFileSync('data/leaderboard.json', JSON.stringify({
   wallets: ranked.sort((a, b) => b.k - a.k), pools: poolStats,
 }));
 if (failed) console.log('failures', fails);
+await saveHistory();
 console.log(`done in ${Math.round((Date.now() - started) / 1000)}s: ${ranked.length} ranked, ${poolStats.length} pools, ${skipped} skipped (too many pools), ${failed} failed`);
+
+// Every crawled wallet, ranked or not, with per-pool rows, goes to the history database (api/crawl.js).
+// ponytail: ~3 KB per wallet per day; prune old rows or keep summaries only if D1 nears its 5 GB.
+async function saveHistory() {
+  if (!process.env.CRAWL_KEY) return console.log('CRAWL_KEY not set, history not saved');
+  const date = new Date(started).toISOString().slice(0, 10);
+  const place = new Map(ranked.map((w, i) => [w.w, i + 1])); // ranked is sorted best first by now
+  const rows = results.filter(Boolean).map(({ w, s, status, error }) => s ? {
+    w, status, ranked: place.has(w), rank: place.get(w), k: round(s.feesKept, 4), fees: round(s.feesUsd, 2), lp: round(s.vsHodl, 2),
+    pnl: round(s.pnlUsd, 2), dep: round(s.depositedUsd, 2), pools: s.rows.length, pos: s.positions, open: s.openPositions,
+    rows: s.rows.map(r => ({ a: r.address, n: r.name, k: round(r.feesKept, 4), lp: round(r.vsHodl, 2), f: round(r.feesUsd, 2), d: round(r.depositedUsd, 2), o: r.open ? 1 : 0 })),
+  } : { w, status, error });
+  const run = { pools: pools.length, walletsFound: seen.size, crawled: ok.length, ranked: ranked.length, skipped, failed, seconds: Math.round((Date.now() - started) / 1000) };
+  let saved = 0;
+  for (let i = 0; i < rows.length || i === 0; i += 150) {
+    const r = await fetch(`${process.env.API ?? 'https://api.shouldaheld.com'}/crawl`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.CRAWL_KEY}` },
+      body: JSON.stringify({ date, run: i === 0 ? run : undefined, wallets: rows.slice(i, i + 150) }),
+    });
+    if (!r.ok) { console.warn('history save failed', r.status, await r.text()); return; }
+    saved += (await r.json()).saved;
+  }
+  console.log(`history: ${saved} wallets saved for ${date}`);
+}
