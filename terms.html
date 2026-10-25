@@ -27,9 +27,10 @@
   <p>Data comes from the public Meteora API as-is. It can be incomplete, delayed or wrong, and some prices are estimates (for example, when a position was swapped entirely into one token, or a token has no current price). The site is provided "as is", without warranties of any kind. To the extent the law allows, we are not liable for any loss arising from use of the site.</p>
 
   <h2 id="privacy">Privacy</h2>
-  <p><b>Checking a wallet.</b> The address you enter is sent from your browser directly to the Meteora API to fetch public on-chain data. We don't receive or store the address or the result of a check. The address appears in the page link so you can share your result; anyone with the link can see the same public data.</p>
+  <p><b>Checking a wallet.</b> The address you enter is sent from your browser directly to the Meteora API to fetch public on-chain data. To count checks we store a one-way hash of the address (not the address itself) with its result: fees kept, fees earned and number of pools. The address appears in the page link so you can share your result; anyone with the link can see the same public data.</p>
+  <p><b>Sharing on X.</b> When you press "Share on X", we store the result card you see on the page together with the wallet address, so the link you post can show that card. Anyone with the link can see it.</p>
   <p><b>Joining the waitlist.</b> If you join, we store your email and/or X handle, the option you picked, the wallet you checked and its result (fees kept and fees earned), and the date. We use this only to contact you about the copy-LP launch and to understand who is interested. We don't sell or share it. The data is stored with Cloudflare, our hosting provider. To see or delete your entry, email <a href="mailto:hello@shouldaheld.com">hello@shouldaheld.com</a>.</p>
-  <p><b>Analytics.</b> We count page visits with Cloudflare Web Analytics, which uses no cookies and doesn't track you across sites. We use no advertising or tracking cookies.</p>
+  <p><b>Analytics.</b> We count page visits ourselves: a visit is stored with its date and, if you came from a shared card, that card's id. No IP address, no cookies, no tracking across sites, no advertising.</p>
   <p>Meteora handles requests under its own terms and privacy policy. Wallet addresses are public on the Solana blockchain, but an address can be linked to a person, so share links with that in mind.</p>
 
   <h2>Third parties</h2>

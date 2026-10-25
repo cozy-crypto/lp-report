@@ -1,9 +1,0 @@
-name = "shouldaheld-api"
-main = "worker.js"
-compatibility_date = "2026-10-01"
-routes = [{ pattern = "api.shouldaheld.com", custom_domain = true }]
-
-[[d1_databases]]
-binding = "DB"
-database_name = "shouldaheld"
-database_id = "58d2f01f-6ca2-4891-9fac-c6bfacc11b7a"

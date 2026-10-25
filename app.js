@@ -4,8 +4,15 @@ const API = 'https://dlmm.datapi.meteora.ag';
 const WALLET = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const PARALLEL = 8; // Meteora allows 30 requests/s
 const EXAMPLE = 'Abaqj8ivq6Uoinc9CQiiZ9GQNDB2RFSWqhpJKf9mN6Gu'; // an active public Meteora LP wallet
-const WAITLIST = location.hostname === 'localhost' ? 'http://127.0.0.1:8788/waitlist' : 'https://api.shouldaheld.com/waitlist';
-let lastResult = {}; // wallet and result sent along with a waitlist signup
+const BACKEND = location.hostname === 'localhost' ? 'http://127.0.0.1:8788' : 'https://api.shouldaheld.com';
+const params = new URLSearchParams(location.search);
+const REF = /^[A-Za-z0-9]{10}$/.test(params.get('r') ?? '') ? params.get('r') : null; // came from a shared card
+let lastResult = {}; // wallet and result sent along with a waitlist signup or a shared card
+
+// Funnel events for our own analytics. Sent as text/plain to skip the CORS preflight; failures are ignored.
+const track = (type, data = {}) => fetch(`${BACKEND}/event`, {
+  method: 'POST', keepalive: true, body: JSON.stringify({ type, ref: REF, ...data }),
+}).catch(() => {});
 
 const $ = id => document.getElementById(id);
 const usd = v => (v < 0 ? '−' : '') + '$' + Math.abs(v).toLocaleString('en-US', { maximumFractionDigits: Math.abs(v) < 100 ? 2 : 0 });
@@ -109,21 +116,40 @@ function render(s, user) {
   $('rows').innerHTML = top.map(tr).join('');
   $('rows-note').textContent = s.rows.length > 10 ? `Best 5 and worst 5 of ${s.rows.length} pools.` : '';
 
-  const link = `${location.origin}${location.pathname}?wallet=${user}`;
-  const text = s.feesKept === undefined
+  lastResult = { wallet: user, feesKept: s.feesKept, feesUsd: s.feesUsd, lpUsd: s.vsHodl };
+  shareText = s.feesKept === undefined
     ? `Liquidity earned me ${signed(s.vsHodl)} after price moves. Get your receipt from @shouldaheld`
     : `I kept ${pct(s.feesKept)} of my LP fees after price moves: ${signed(s.vsHodl)} from liquidity, the rest of my PnL was the market. ${s.feesKept >= 0.5 ? 'Not bad.' : s.feesKept >= 0 ? 'Could be worse.' : 'Shoulda held.'} Get your receipt from @shouldaheld`;
-  $('share-x').href = `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(link)}`;
+  $('share-x').href = intent(`${location.origin}${location.pathname}?wallet=${user}`); // fallback if the card upload fails
   drawCard(s);
-  renderWaitlist(s, user);
+  renderWaitlist(s);
+  $('shared').hidden = !(REF && user === params.get('wallet'));
   $('intro').hidden = true;
   $('result').hidden = false;
 }
 
+let shareText = '';
+const intent = url => `https://x.com/intent/post?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}`;
+
+// Upload the drawn card and post its short link, so X shows the receipt under the post.
+// The tab opens right away on click (browsers block pop-ups opened after an await).
+async function shareOnX(e) {
+  e.preventDefault();
+  const tab = window.open('', '_blank');
+  let url = $('share-x').href;
+  try {
+    const png = await new Promise(r => $('card').toBlob(r, 'image/png'));
+    const q = new URLSearchParams({ wallet: lastResult.wallet, lp: lastResult.lpUsd });
+    if (lastResult.feesKept !== undefined) q.set('k', lastResult.feesKept);
+    const r = await fetch(`${BACKEND}/card?${q}`, { method: 'POST', body: png });
+    if (r.ok) url = intent((await r.json()).url);
+  } catch { /* keep the plain link */ }
+  if (tab) tab.location = url; else location.href = url;
+}
+
 // Strong LPs are pitched the leader side, everyone else the copying side.
-function renderWaitlist(s, user) {
+function renderWaitlist(s) {
   const lead = s.feesKept >= 0.5;
-  lastResult = { wallet: user, feesKept: s.feesKept, feesUsd: s.feesUsd };
   $('wl-title').textContent = lead ? 'You kept most of your fees. Want to get paid for it?' : 'Want to copy LPs who keep their fees?';
   $('wl-text').textContent = lead
     ? "We're building copy-LP: others follow your positions automatically, and you earn a share of the fees they make."
@@ -139,7 +165,7 @@ async function joinWaitlist(e) {
   if (!email && !x) return msg('Add an email or an X handle.', 'err');
   $('wl-go').disabled = true;
   try {
-    const r = await fetch(WAITLIST, {
+    const r = await fetch(`${BACKEND}/waitlist`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, x, role: new FormData($('waitlist')).get('role'), website: $('wl-website').value, ...lastResult }),
@@ -176,7 +202,9 @@ async function run(user) {
   history.replaceState(null, '', `?wallet=${user}`);
   $('go').disabled = true; $('go').textContent = 'Checking…'; $('result').hidden = true;
   try {
-    render(await report(user, (done, total) => { $('go').textContent = `Pools ${done}/${total}`; }), user);
+    const s = await report(user, (done, total) => { $('go').textContent = `Pools ${done}/${total}`; });
+    render(s, user);
+    track('check', { wallet: user, feesKept: s.feesKept, feesUsd: s.feesUsd, pools: s.rows.length });
   } catch (e) {
     $('error').textContent = `Could not load data: ${e.message}. Try again in a minute.`;
   } finally {
@@ -191,9 +219,17 @@ $('example').addEventListener('click', e => {
   $('wallet').value = EXAMPLE;
   run(EXAMPLE);
 });
+$('share-x').addEventListener('click', shareOnX);
 $('download').addEventListener('click', () => {
   const a = document.createElement('a');
-  a.href = $('card').toDataURL('image/png'); a.download = 'lp-vs-hold.png'; a.click();
+  a.href = $('card').toDataURL('image/png'); a.download = 'shoulda-held-receipt.png'; a.click();
 });
-const fromUrl = new URLSearchParams(location.search).get('wallet');
+$('check-own').addEventListener('click', () => {
+  $('wallet').value = '';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  $('wallet').focus();
+});
+
+track('visit');
+const fromUrl = params.get('wallet');
 if (fromUrl) { $('wallet').value = fromUrl; run(fromUrl); }

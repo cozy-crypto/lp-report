@@ -1,0 +1,19 @@
+name = "shouldaheld-api"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+routes = [
+  { pattern = "api.shouldaheld.com", custom_domain = true },
+  { pattern = "r.shouldaheld.com", custom_domain = true },
+  { pattern = "admin.shouldaheld.com", custom_domain = true },
+]
+
+# Cloudflare Access app guarding admin.shouldaheld.com. Not secrets: the team domain and the app's AUD tag.
+# Empty values keep the admin closed.
+[vars]
+ACCESS_TEAM = ""
+ACCESS_AUD = ""
+
+[[d1_databases]]
+binding = "DB"
+database_name = "shouldaheld"
+database_id = "58d2f01f-6ca2-4891-9fac-c6bfacc11b7a"

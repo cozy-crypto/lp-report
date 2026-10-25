@@ -21,7 +21,7 @@
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 2px; }
   .card b { font-size: 28px; }
   .card.accent { border-color: var(--accent); }
-  .steps { padding-left: 20px; } .steps li { margin-bottom: 8px; }
+  .shared { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--accent); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; }
   form { display: flex; gap: 8px; margin: 24px 0 8px; }
   input { flex: 1; min-width: 0; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font: inherit; }
   button, .btn { padding: 12px 18px; border-radius: 8px; border: 0; background: var(--accent); color: #0d1117; font: 600 16px system-ui, sans-serif; cursor: pointer; text-decoration: none; display: inline-block; }
@@ -57,8 +57,8 @@
 <body>
 <main>
   <p class="eyebrow">For Solana liquidity providers (LPs)</p>
-  <h1>Your PnL includes the market.<br>We show what liquidity earned you.</h1>
-  <p class="lead">When your tokens go up, your PnL goes up too, even if providing liquidity lost money. Paste a wallet to split the result into what the market did and what liquidity actually earned, and see how much of your fees you kept.</p>
+  <h1>Your PnL includes the market.<br>See what liquidity earned you.</h1>
+  <p class="lead">Paste a Solana wallet. Get a receipt: what the market did, what liquidity did, and how much of your fees you kept.</p>
 
   <form id="form">
     <input id="wallet" placeholder="Paste a Solana wallet address" autocomplete="off" spellcheck="false" aria-label="Solana wallet address">
@@ -68,24 +68,21 @@
   <div id="error" role="alert"></div>
 
   <section id="intro">
-    <h2>Example: a +$450 PnL that earned nothing</h2>
-    <p class="muted">You put 10 SOL into a SOL-USDC pool when SOL is $100, so $1,000. SOL rises to $150. The pool now holds $1,420 of tokens, plus $30 of fees.</p>
+    <h2>A +$450 PnL that earned nothing</h2>
+    <p class="muted">10 SOL into a pool at $100. SOL rises to $150.</p>
     <div class="compare">
       <div class="card"><span class="muted">Your PnL</span><b class="good">+$450</b><span class="muted">$1,450 now vs $1,000 in</span></div>
       <div class="card"><span class="muted">From the market</span><b>+$500</b><span class="muted">SOL went up; holding 10 SOL gives $1,500</span></div>
       <div class="card accent"><span class="muted">From liquidity</span><b class="bad">−$50</b><span class="muted">$30 fees, −$80 from price moves</span></div>
     </div>
-    <p class="muted">Fees kept: <b class="bad">−167%</b>. Price moves cost more than the fees earned, so holding would have been better. A study of Uniswap found about half of liquidity providers ended up behind simply holding.</p>
-
-    <h2>How it works</h2>
-    <ol class="steps">
-      <li><b>Paste any Solana wallet.</b> Yours or anyone's: on-chain data is public.</li>
-      <li><b>We read its liquidity positions</b> from public data: what went in, what came out, the fees. Meteora DLMM for now.</li>
-      <li><b>You get your receipt:</b> PnL split into market and liquidity, and how much of your fees you kept. Plus a card to share on X.</li>
-    </ol>
+    <p class="muted">Fees kept: <b class="bad">−167%</b>. Holding would have been better.</p>
   </section>
 
   <section id="result" hidden>
+    <div id="shared" class="shared" hidden>
+      <span>This is someone else's receipt.</span>
+      <button id="check-own" type="button">Check your wallet</button>
+    </div>
     <p id="verdict"></p>
     <div id="full">
     <span class="muted">Fees kept</span>
