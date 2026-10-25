@@ -1,20 +1,25 @@
 // One Worker for shouldaheld.com on three hostnames:
-//   api.shouldaheld.com    POST /waitlist, POST /event, POST /card
+//   api.shouldaheld.com    POST /waitlist, POST /event, POST /card, GET /stats (for the agent farm, needs STATS_KEY)
 //   r.shouldaheld.com      /<id> share page for X, /<id>.png its card image
 //   admin.shouldaheld.com  funnel and leads, behind Cloudflare Access
 // The last two also answer at /r/ and /admin on any host (that's how `wrangler dev` reaches them);
 // the admin stays closed there too without a valid Access token.
 import { admin } from './admin.js';
 import { saveCard, sharePage, cardImage } from './share.js';
+import { buildStats } from './stats.js';
 import { SITE, WALLET, num, now, hashWallet } from './util.js';
 
 const ORIGINS = [SITE, 'http://localhost:8787'];
 const ROLES = ['copy', 'lead', 'curious'];
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,200}\.[^\s@]{2,}$/;
 const HANDLE = /^[A-Za-z0-9_]{1,15}$/;
+const CODE = /^[a-z0-9]{6}$/;
+const REFERRAL_BOOST = 10; // places moved up per person you bring
+const EVENTS = ['visit', 'check', 'action'];
+const newCode = () => [...crypto.getRandomValues(new Uint8Array(6))].map(b => 'abcdefghijkmnpqrstuvwxyz23456789'[b % 32]).join('');
 
 export default {
-  async fetch(req, env) {
+  async fetch(req, env, ctx) {
     const url = new URL(req.url);
     const SHARE_BASE = 'https://r.shouldaheld.com';
 
@@ -23,7 +28,7 @@ export default {
     }
     if (url.hostname.startsWith('r.') || url.pathname.startsWith('/r/')) {
       const id = url.pathname.replace(/^\/r\//, '/').slice(1);
-      return id.endsWith('.png') ? cardImage(env, id.slice(0, -4)) : sharePage(env, id, SHARE_BASE);
+      return id.endsWith('.png') ? cardImage(env, id.slice(0, -4)) : sharePage(req, env, ctx, id, SHARE_BASE);
     }
 
     const origin = req.headers.get('Origin');
@@ -36,6 +41,11 @@ export default {
     if (req.method === 'POST' && url.pathname === '/waitlist') return waitlist(req, env, json);
     if (req.method === 'POST' && url.pathname === '/event') return event(req, env, json);
     if (req.method === 'POST' && url.pathname === '/card') return saveCard(req, env, json, SHARE_BASE);
+    if (req.method === 'GET' && url.pathname === '/stats') {
+      const key = req.headers.get('Authorization')?.replace(/^Bearer /, '') ?? url.searchParams.get('key');
+      if (!env.STATS_KEY || key !== env.STATS_KEY) return json({ error: 'Forbidden' }, 403);
+      return json(await buildStats(env));
+    }
     return json({ error: 'Not found' }, 404);
   },
 };
@@ -57,28 +67,43 @@ async function waitlist(req, env, json) {
   // One row per person: signing up again updates the role and latest result.
   const contact = email || `@${x.toLowerCase()}`;
   const wallet = WALLET.test(b.wallet ?? '') ? b.wallet : null;
+  const referredBy = CODE.test(b.referredBy ?? '') ? b.referredBy : null;
+  const meta = JSON.stringify({ referredBy, source: typeof b.source === 'string' ? b.source.slice(0, 64) : null, country: req.cf?.country });
+  // Signing up again keeps the first code, referrer and join date; it updates the role and latest result.
   await env.DB.batch([
     env.DB.prepare(
-      `INSERT INTO waitlist (contact, email, x, role, wallet, fees_kept, fees_usd, deposited_usd, created_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+      `INSERT INTO waitlist (contact, email, x, role, wallet, fees_kept, fees_usd, deposited_usd, code, referred_by, created_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
        ON CONFLICT(contact) DO UPDATE SET x = COALESCE(excluded.x, x), role = excluded.role,
          wallet = COALESCE(excluded.wallet, wallet), fees_kept = COALESCE(excluded.fees_kept, fees_kept),
-         fees_usd = COALESCE(excluded.fees_usd, fees_usd), deposited_usd = COALESCE(excluded.deposited_usd, deposited_usd)`,
-    ).bind(contact, email || null, x || null, b.role, wallet, num(b.feesKept), num(b.feesUsd), num(b.depositedUsd), now()),
-    env.DB.prepare('INSERT INTO events (type, wallet_hash, fees_kept, fees_usd, created_at) VALUES (?1, ?2, ?3, ?4, ?5)')
-      .bind('signup', wallet && await hashWallet(wallet), num(b.feesKept), num(b.feesUsd), now()),
+         fees_usd = COALESCE(excluded.fees_usd, fees_usd), deposited_usd = COALESCE(excluded.deposited_usd, deposited_usd),
+         code = COALESCE(code, excluded.code), referred_by = COALESCE(referred_by, excluded.referred_by)`,
+    ).bind(contact, email || null, x || null, b.role, wallet, num(b.feesKept), num(b.feesUsd), num(b.depositedUsd), newCode(), referredBy, now()),
+    env.DB.prepare('INSERT INTO events (type, wallet_hash, fees_kept, fees_usd, meta, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)')
+      .bind('signup', wallet && await hashWallet(wallet), num(b.feesKept), num(b.feesUsd), meta, now()),
   ]);
-  return json({ ok: true });
+  return json(await queue(env, contact));
+}
+
+// Place in the waitlist: join order, moved up REFERRAL_BOOST places per signup that used your code.
+async function queue(env, contact) {
+  const me = await env.DB.prepare(
+    `SELECT code, created_at, (SELECT count(*) FROM waitlist w WHERE w.referred_by = waitlist.code AND w.contact != waitlist.contact) AS referrals,
+       (SELECT count(*) FROM waitlist w WHERE w.created_at < waitlist.created_at) AS ahead,
+       (SELECT count(*) FROM waitlist) AS total
+     FROM waitlist WHERE contact = ?1`,
+  ).bind(contact).first();
+  return { ok: true, code: me.code, referrals: me.referrals, total: me.total, position: Math.max(1, me.ahead + 1 - REFERRAL_BOOST * me.referrals) };
 }
 
 // Body is JSON sent as text/plain so the browser skips the CORS preflight on every page view.
 async function event(req, env, json) {
   let b;
   try { b = JSON.parse(await req.text()); } catch { return json({ error: 'Invalid request' }, 400); }
-  if (!['visit', 'check'].includes(b.type)) return json({ error: 'Unknown event' }, 400);
+  if (!EVENTS.includes(b.type)) return json({ error: 'Unknown event' }, 400);
   const wallet = WALLET.test(b.wallet ?? '') ? b.wallet : null;
   // Free-form extras (traffic source, positions, deposit size, load time…); capped so a bad client can't bloat rows.
-  const meta = b.meta && typeof b.meta === 'object' ? JSON.stringify(b.meta).slice(0, 1000) : null;
+  const meta = b.meta && typeof b.meta === 'object' ? JSON.stringify({ ...b.meta, country: req.cf?.country }).slice(0, 1000) : null;
   await env.DB.prepare(
     'INSERT INTO events (type, wallet_hash, fees_kept, fees_usd, pools, ref, meta, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)',
   ).bind(

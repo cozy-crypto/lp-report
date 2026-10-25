@@ -1,23 +1,13 @@
 import { report, DAYS } from './meteora.js';
 import { usd, signed, pct, tone } from './format.js';
+import { BACKEND, params, REF, track, action, trackVisit, referredBy, firstSource } from './analytics.js';
 
 const WALLET = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const EXAMPLE = 'Abaqj8ivq6Uoinc9CQiiZ9GQNDB2RFSWqhpJKf9mN6Gu'; // an active public Meteora LP wallet
-const BACKEND = location.hostname === 'localhost' ? 'http://127.0.0.1:8788' : 'https://api.shouldaheld.com';
-const params = new URLSearchParams(location.search);
-const REF = /^[A-Za-z0-9]{10}$/.test(params.get('r') ?? '') ? params.get('r') : null; // came from a shared card
 let lastResult = {}; // wallet and result sent along with a waitlist signup or a shared card
 
-// Funnel events for our own analytics. Sent as text/plain to skip the CORS preflight; failures are ignored.
-const track = (type, data = {}) => fetch(`${BACKEND}/event`, {
-  method: 'POST', keepalive: true, body: JSON.stringify({ type, ref: REF, ...data }),
-}).catch(() => {});
 
 const $ = id => document.getElementById(id);
-
-
-
-
 
 
 function verdict(s) {
@@ -69,10 +59,16 @@ function render(s, user, b) {
   $('rows-note').textContent = s.rows.length > 10 ? `Best 5 and worst 5 of ${s.rows.length} pools.` : '';
 
   lastResult = { wallet: user, feesKept: s.feesKept, feesUsd: s.feesUsd, lpUsd: s.vsHodl, depositedUsd: s.depositedUsd };
-  shareText = s.feesKept === undefined
+  mine = s;
+  const rank = topShare(bench);
+  cardKind = rank ? 'rank' : 'receipt';
+  shareText = rank
+    ? `Top ${rank} of Meteora LPs: I kept ${pct(s.feesKept)} of my LP fees after price moves (${signed(s.vsHodl)} from liquidity). Where do you rank? @shouldaheld`
+    : s.feesKept === undefined
     ? `Liquidity earned me ${signed(s.vsHodl)} after price moves. Get your receipt from @shouldaheld`
     : `I kept ${pct(s.feesKept)} of my LP fees after price moves: ${signed(s.vsHodl)} from liquidity, the rest of my PnL was the market. ${bench ? `Better than ${pct(bench.beat)} of LPs.` : s.feesKept >= 0.5 ? 'Not bad.' : s.feesKept >= 0 ? 'Could be worse.' : 'Shoulda held.'} Get your receipt from @shouldaheld`;
-  $('share-x').href = intent(`${location.origin}${location.pathname}?wallet=${user}`); // fallback if the card upload fails
+  $('share-x').href = intent(shareText, `${location.origin}${location.pathname}?wallet=${user}`); // fallback if the card upload fails
+  $('duel-result').hidden = true;
   drawCard(s, bench);
   renderWaitlist(s);
   $('shared').hidden = !(REF && user === params.get('wallet'));
@@ -81,23 +77,61 @@ function render(s, user, b) {
   $('result').hidden = false;
 }
 
-let shareText = '';
-const intent = url => `https://x.com/intent/post?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}`;
+let shareText = '', cardKind = 'receipt', mine = null, duelText = '';
+const intent = (text, url) => `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
+// "12%" when the wallet is in the better half of ranked LPs: a brag people actually post.
+const topShare = bench => (bench && bench.beat >= 0.5 ? `${Math.max(1, Math.round((1 - bench.beat) * 100))}%` : null);
 
-// Upload the drawn card and post its short link, so X shows the receipt under the post.
+// Upload the drawn card and post its short link, so X shows the card under the post.
 // The tab opens right away on click (browsers block pop-ups opened after an await).
-async function shareOnX(e) {
-  e.preventDefault();
+async function shareCard(canvas, kind, text, fallback) {
   const tab = window.open('', '_blank');
-  let url = $('share-x').href;
+  let url = fallback;
   try {
-    const png = await new Promise(r => $('card').toBlob(r, 'image/png'));
-    const q = new URLSearchParams({ wallet: lastResult.wallet, lp: lastResult.lpUsd });
+    const png = await new Promise(r => canvas.toBlob(r, 'image/png'));
+    const q = new URLSearchParams({ wallet: lastResult.wallet, lp: lastResult.lpUsd, kind });
     if (lastResult.feesKept !== undefined) q.set('k', lastResult.feesKept);
     const r = await fetch(`${BACKEND}/card?${q}`, { method: 'POST', body: png });
-    if (r.ok) url = intent((await r.json()).url);
+    if (r.ok) url = intent(text, (await r.json()).url);
   } catch { /* keep the plain link */ }
   if (tab) tab.location = url; else location.href = url;
+}
+
+function shareOnX(e) {
+  e.preventDefault();
+  shareCard($('card'), cardKind, shareText, $('share-x').href);
+}
+
+// Duel: the visitor's receipt next to another wallet's, as a card that tags the friend.
+async function runDuel(e) {
+  e?.preventDefault();
+  const other = $('duel-wallet').value.trim(), handle = $('duel-x').value.trim().replace(/^@/, '');
+  const msg = t => { $('duel-msg').textContent = t; };
+  if (!WALLET.test(other)) return msg('That does not look like a Solana wallet address.');
+  if (handle && !/^[A-Za-z0-9_]{1,15}$/.test(handle)) return msg("That X handle doesn't look right.");
+  if (other === lastResult.wallet) return msg("That's the same wallet.");
+  msg(''); $('duel-go').disabled = true;
+  try {
+    const them = await report(other, (done, total) => { $('duel-go').textContent = `Reading pool ${done} of ${total}…`; });
+    const name = handle ? `@${handle}` : `${other.slice(0, 4)}…${other.slice(-4)}`;
+    const k = x => x.feesKept ?? -Infinity;
+    const win = k(mine) === k(them) ? 'tie' : k(mine) > k(them) ? 'me' : 'them';
+    const row = (label, a, b, f, cls) => `<tr><td>${label}</td><td class="${cls ? tone(a ?? 0) : ''}">${f(a)}</td><td class="${cls ? tone(b ?? 0) : ''}">${f(b)}</td></tr>`;
+    $('duel-head').innerHTML = `<tr><th></th><th>You</th><th>${name}</th></tr>`;
+    $('duel-rows').innerHTML = row('Fees kept', mine.feesKept, them.feesKept, pct, true)
+      + row('Liquidity', mine.vsHodl, them.vsHodl, signed, true) + row('Fees earned', mine.feesUsd, them.feesUsd, usd)
+      + row('Deposited', mine.depositedUsd, them.depositedUsd, usd);
+    $('duel-verdict').textContent = win === 'tie' ? 'A tie.' : win === 'me' ? 'You kept more of your fees.' : `${name} kept more of their fees.`;
+    duelText = `My LP receipt vs ${name}: I kept ${pct(mine.feesKept)} of my fees after price moves, ${handle ? 'they' : 'this wallet'} kept ${pct(them.feesKept)}. `
+      + `${win === 'me' ? 'Shoulda held? Not me.' : win === 'them' ? 'Fine. You win this one.' : 'Dead even.'} Compare yours: @shouldaheld`;
+    drawDuel(mine, them, name, win);
+    $('duel-result').hidden = false;
+    action('duel', { win, handle: !!handle });
+  } catch (err) {
+    msg(`Could not load that wallet: ${err.message}.`);
+  } finally {
+    $('duel-go').disabled = false; $('duel-go').textContent = 'Compare';
+  }
 }
 
 // Strong LPs are pitched the leader side, everyone else the copying side.
@@ -121,11 +155,12 @@ async function joinWaitlist(e) {
     const r = await fetch(`${BACKEND}/waitlist`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, x, role: new FormData($('waitlist')).get('role'), website: $('wl-website').value, ...lastResult }),
+      body: JSON.stringify({ email, x, role: new FormData($('waitlist')).get('role'), website: $('wl-website').value, referredBy, source: firstSource, ...lastResult }),
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.error || 'Something went wrong');
-    msg("You're on the list. We'll reach out when copying opens.", 'ok');
+    msg('', 'ok');
+    showQueue(d);
   } catch (err) {
     msg(`${err.message}. Try again.`, 'err');
   } finally {
@@ -133,8 +168,20 @@ async function joinWaitlist(e) {
   }
 }
 
-// Share card for X, 1200×630.
+// After joining: place in line and a personal link; every LP who joins through it moves them up.
+function showQueue(d) {
+  const link = `https://shouldaheld.com/?j=${d.code}&utm_source=referral`;
+  $('wl-form').hidden = true; $('wl-done').hidden = false;
+  $('wl-place').textContent = `#${d.position.toLocaleString('en-US')}`;
+  $('wl-of').textContent = `of ${d.total.toLocaleString('en-US')} in line for copy-LP${d.referrals ? ` · ${d.referrals} joined through you` : ''}`;
+  $('wl-link').value = link;
+  $('wl-share').href = intent(`I'm #${d.position} in line for copy-LP. First, see how much of your LP fees you actually keep: @shouldaheld`, link);
+}
+
+// Share card for X, 1200×630. In the better half of ranked LPs it leads with the rank.
 function drawCard(s, bench) {
+  const rank = topShare(bench);
+  if (rank) return drawRank(s, bench, rank);
   const c = $('card'), g = c.getContext('2d');
   const measured = s.feesKept !== undefined;
   const good = (s.feesKept ?? s.vsHodl) >= 0;
@@ -148,6 +195,35 @@ function drawCard(s, bench) {
   if (bench) { g.fillStyle = '#58a6ff'; g.font = '600 34px system-ui, sans-serif'; g.fillText(`Better than ${pct(bench.beat)} of Meteora LPs`, 80, 470); }
   g.fillStyle = '#8b949e'; g.font = '400 26px system-ui, sans-serif';
   g.fillText('Shoulda held? Get your receipt · @shouldaheld', 80, 550);
+}
+
+function drawRank(s, bench, rank) {
+  const g = $('card').getContext('2d');
+  g.fillStyle = '#0d1117'; g.fillRect(0, 0, 1200, 630);
+  g.fillStyle = '#8b949e'; g.font = '500 34px system-ui, sans-serif';
+  g.fillText(`Ranked by LP fees kept after price moves, ${bench.n.toLocaleString('en-US')} Meteora LPs`, 80, 130);
+  g.fillStyle = '#3fb950'; g.font = '800 150px system-ui, sans-serif';
+  g.fillText(`TOP ${rank}`, 80, 310);
+  g.fillStyle = '#e6edf3'; g.font = '400 36px system-ui, sans-serif';
+  g.fillText(`Kept ${pct(s.feesKept)} of ${usd(s.feesUsd)} in fees · liquidity ${signed(s.vsHodl)}`, 80, 400);
+  g.fillStyle = '#8b949e'; g.font = '400 26px system-ui, sans-serif';
+  g.fillText('Where do you rank? shouldaheld.com · @shouldaheld', 80, 550);
+}
+
+function drawDuel(a, b, name, win) {
+  const g = $('duel-card').getContext('2d');
+  g.fillStyle = '#0d1117'; g.fillRect(0, 0, 1200, 630);
+  g.fillStyle = '#8b949e'; g.font = '500 34px system-ui, sans-serif';
+  g.fillText('LP fees kept after price moves', 80, 120);
+  const side = (x, label, v, won) => {
+    g.fillStyle = '#8b949e'; g.font = '500 36px system-ui, sans-serif'; g.fillText(label, x, 220);
+    g.fillStyle = (v ?? 0) >= 0 ? '#3fb950' : '#f85149'; g.font = `${won ? 800 : 600} 130px system-ui, sans-serif`; g.fillText(pct(v), x, 370);
+  };
+  side(80, 'Me', a.feesKept, win === 'me');
+  side(640, name, b.feesKept, win === 'them');
+  g.fillStyle = '#e6edf3'; g.font = '700 46px system-ui, sans-serif'; g.fillText('vs', 560, 330);
+  g.fillStyle = '#8b949e'; g.font = '400 26px system-ui, sans-serif';
+  g.fillText('Compare yours: shouldaheld.com · @shouldaheld', 80, 550);
 }
 
 async function run(user) {
@@ -185,7 +261,18 @@ $('example').addEventListener('click', e => {
   run(EXAMPLE);
 });
 $('share-x').addEventListener('click', shareOnX);
+$('duel-form').addEventListener('submit', runDuel);
+$('duel-share').addEventListener('click', e => {
+  e.preventDefault();
+  shareCard($('duel-card'), 'duel', duelText, intent(duelText, `https://shouldaheld.com/?wallet=${lastResult.wallet}`));
+});
+$('wl-copy').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText($('wl-link').value); $('wl-copy').textContent = 'Copied'; } catch { $('wl-link').select(); }
+  action('copy_referral');
+});
+$('wl-share').addEventListener('click', () => action('share_referral'));
 $('download').addEventListener('click', () => {
+  action('download', { kind: cardKind });
   const a = document.createElement('a');
   a.href = $('card').toDataURL('image/png'); a.download = 'shoulda-held-receipt.png'; a.click();
 });
@@ -195,12 +282,6 @@ $('check-own').addEventListener('click', () => {
   $('wallet').focus();
 });
 
-// Where the visit came from and on what, for the admin. No IPs, no cookies.
-track('visit', {
-  meta: {
-    from: params.get('utm_source') || (document.referrer && new URL(document.referrer).hostname) || 'direct',
-    mobile: matchMedia('(max-width: 640px)').matches, lang: navigator.language,
-  },
-});
+trackVisit('home');
 const fromUrl = params.get('wallet');
 if (fromUrl) { $('wallet').value = fromUrl; run(fromUrl); }

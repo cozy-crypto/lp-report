@@ -1,4 +1,5 @@
 import { usd, signed, pct, tone } from './format.js';
+import { trackVisit, action } from './analytics.js';
 
 const $ = id => document.getElementById(id);
 const SHOW = 50;
@@ -41,15 +42,24 @@ function render() {
 
 for (const b of document.querySelectorAll('.tabs button')) b.addEventListener('click', () => {
   tab = b.dataset.tab;
+  action('board_tab', { tab });
   for (const x of document.querySelectorAll('.tabs button')) x.setAttribute('aria-pressed', x === b);
   render();
 });
 for (const b of document.querySelectorAll('.sizes button')) b.addEventListener('click', () => {
   min = Number(b.dataset.min);
+  action('board_size', { min });
   for (const x of document.querySelectorAll('.sizes button')) x.setAttribute('aria-pressed', x === b);
   render();
 });
 
+// Which rows people open tells the strategist what kind of LP is interesting.
+$('body').addEventListener('click', e => {
+  const a = e.target.closest('a');
+  if (a) action('board_open', { tab, rank: a.closest('tr').rowIndex });
+});
+
+trackVisit('top');
 try {
   data = await (await fetch('data/leaderboard.json', { cache: 'no-cache' })).json();
   const day = new Date(data.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });

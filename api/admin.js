@@ -1,6 +1,7 @@
 // admin.shouldaheld.com: funnel and segmented leads. Cloudflare Access sits in front and only lets
 // the allowed email through; the Worker still verifies Access's signed token and refuses without it.
 import { SITE, esc, usd, pct } from './util.js';
+import { buildStats } from './stats.js';
 
 // Who to talk to first. Thresholds are a first guess, tune them once real leads come in.
 export function segments(l) {
@@ -60,7 +61,7 @@ async function leadsCsv(env) {
 async function page(env, email) {
   const day = n => new Date(Date.now() - n * 864e5).toISOString();
   const q = (sql, ...args) => env.DB.prepare(sql).bind(...args).all().then(r => r.results);
-  const [week, all, daily, kept, leads, sources, sizes, [stats]] = await Promise.all([
+  const [week, all, daily, kept, leads, sources, sizes, [stats], farm] = await Promise.all([
     funnel(env, day(7)),
     funnel(env, '0'),
     env.DB.prepare(`SELECT substr(created_at, 1, 10) AS d, type, count(*) AS n FROM events
@@ -78,7 +79,10 @@ async function page(env, email) {
       sum(type = 'check' AND json_extract(meta, '$.own')) AS own, sum(type = 'check' AND ${OK}) AS checks,
       sum(type = 'check' AND NOT ${OK}) AS errors, avg(CASE WHEN type = 'check' THEN json_extract(meta, '$.ms') END) AS ms
       FROM events WHERE created_at >= ?1`, day(7)),
+    buildStats(env),
   ]);
+  const posted = farm.daily.slice(0, 7).reduce((s, d) => s + d.cardsPosted, 0);
+  const clicks = farm.daily.slice(0, 7).reduce((s, d) => s + d.shareClicks, 0);
 
   const rate = (a, b) => (b ? `${Math.round((a / b) * 100)}%` : '—');
   const funnelRow = (label, f) => `<tr><td>${label}</td><td>${f.visit}</td><td>${f.check} <small>(${f.wallets} wallets)</small></td>
@@ -126,6 +130,20 @@ async function page(env, email) {
     ['Failed checks', stats.errors ?? 0],
     ['Avg check time', stats.ms == null ? '—' : `${(stats.ms / 1000).toFixed(1)}s`],
   ].map(([k, v]) => `<div class="card"><span class="muted">${k}</span><b>${v}</b></div>`).join('')}</div>
+
+<h2>Sharing loop, last 7 days</h2>
+<div class="cards">${[
+    ['Cards shared', week.share], ['Actually posted', posted], ['Clicks on posted cards', clicks],
+    ['Visits from shares', week.fromShares], ['Signups via referral', farm.waitlist?.referred ?? 0],
+  ].map(([k, v]) => `<div class="card"><span class="muted">${k}</span><b>${v}</b></div>`).join('')}</div>
+<p class="muted">Posted = X (or Telegram, Discord…) fetched the card to show a preview, so the link really went out.</p>
+<div class="wrap"><table><thead><tr><th>Card</th><th>Kind</th><th>Fees kept</th><th>Posted on</th><th>Clicks</th><th>Checks from it</th></tr></thead>
+<tbody>${farm.cards.map(c => `<tr><td><a href="https://r.shouldaheld.com/${esc(c.card)}.png" target="_blank">${esc(c.card)}</a></td><td>${esc(c.kind ?? 'receipt')}</td>
+  <td>${pct(c.feesKept)}</td><td>${esc(c.postedOn ?? '—')}</td><td>${c.clicks}</td><td>${c.checksFromCard}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">No shares yet</td></tr>'}</tbody></table></div>
+
+<h2>Campaigns (utm_campaign), last 7 days</h2>
+<div class="wrap"><table><thead><tr><th>Campaign</th><th>Visits</th></tr></thead>
+<tbody>${farm.campaigns.map(r => `<tr><td>${esc(r.campaign)}</td><td>${r.visits}</td></tr>`).join('') || '<tr><td colspan="2" class="muted">No campaign visits yet</td></tr>'}</tbody></table></div>
 
 <h2>Where visits came from, last 7 days</h2>
 <div class="wrap"><table><thead><tr><th>Source</th><th>Visits</th></tr></thead>

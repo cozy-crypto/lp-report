@@ -96,7 +96,19 @@ th { color: var(--muted); font-weight: 500; }
 td:not(:first-child), th:not(:first-child) { text-align: right; white-space: nowrap; }
 td.good { color: var(--good); } td.bad { color: var(--bad); }
 .tag { font-size: 12px; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0 4px; }
-#card { display: none; }
+#card, #duel-card { display: none; }
+.duel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 24px; margin: 40px 0 0; }
+.duel h2 { font-size: 22px; margin: 0 0 14px; }
+.duel input { min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; padding: 12px; }
+.duel input:focus { outline: none; border-color: var(--accent); }
+.duel table td:first-child { color: var(--muted); }
+.duel-verdict { font-weight: 700; font-size: 18px; margin: 16px 0; }
+.err-text { color: var(--bad); min-height: 20px; margin: 8px 0 0; }
+.wl-done .place { margin: 0 0 4px; }
+.wl-done .place b { font-size: 40px; color: var(--accent); font-variant-numeric: tabular-nums; }
+.wl-done .ref { display: flex; gap: 8px; margin: 14px 0 12px; }
+.wl-done .ref input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: 14px var(--mono); padding: 10px; }
+.wl-done > .btn { width: 100%; }
 
 .more { padding: 0 0 24px; }
 footer { border-top: 1px solid var(--line); padding: 24px 0 40px; font-size: 13px; color: var(--muted); }

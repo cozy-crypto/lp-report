@@ -76,9 +76,26 @@
         <button id="download" class="btn secondary" type="button">Download card</button>
       </div>
 
+      <section class="duel">
+        <h2>Compare with a friend</h2>
+        <form id="duel-form" class="fields" novalidate>
+          <input id="duel-wallet" placeholder="Their wallet address" autocomplete="off" spellcheck="false" aria-label="Their wallet address">
+          <input id="duel-x" placeholder="Their X handle (optional)" autocomplete="off" aria-label="Their X handle">
+          <button id="duel-go">Compare</button>
+        </form>
+        <p id="duel-msg" class="err-text" role="status"></p>
+        <div id="duel-result" hidden>
+          <table><thead id="duel-head"></thead><tbody id="duel-rows"></tbody></table>
+          <p id="duel-verdict" class="duel-verdict"></p>
+          <a id="duel-share" class="btn" href="#" target="_blank" rel="noopener">Challenge them on X</a>
+        </div>
+        <canvas id="duel-card" width="1200" height="630" aria-hidden="true"></canvas>
+      </section>
+
       <form id="waitlist" class="waitlist" novalidate>
         <h2 id="wl-title"></h2>
         <p class="muted" id="wl-text"></p>
+        <div id="wl-form">
         <fieldset class="roles">
           <legend>I'm interested in</legend>
           <label class="choice"><input type="radio" name="role" value="copy">Copying top LPs</label>
@@ -90,6 +107,13 @@
           <input id="wl-x" placeholder="X handle (optional)" autocomplete="off" aria-label="X handle">
           <input id="wl-website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
           <button id="wl-go">Join the waitlist</button>
+        </div>
+        </div>
+        <div id="wl-done" class="wl-done" hidden>
+          <p class="place"><b id="wl-place"></b> <span id="wl-of" class="muted"></span></p>
+          <p class="muted">Every LP who joins through your link moves you up 10 places.</p>
+          <div class="ref"><input id="wl-link" readonly aria-label="Your referral link"><button id="wl-copy" type="button" class="btn secondary">Copy</button></div>
+          <a id="wl-share" class="btn" target="_blank" rel="noopener">Share your link on X</a>
         </div>
         <p id="wl-msg" role="status"></p>
         <p class="fine">Only used to tell you when copying opens. <a href="terms.html#privacy">What we keep</a> · delete anytime via <a href="mailto:hello@shouldaheld.com">hello@shouldaheld.com</a></p>
