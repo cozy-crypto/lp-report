@@ -10,8 +10,8 @@ routes = [
 # Cloudflare Access app guarding admin.shouldaheld.com. Not secrets: the team domain and the app's AUD tag.
 # Empty values keep the admin closed.
 [vars]
-ACCESS_TEAM = ""
-ACCESS_AUD = ""
+ACCESS_TEAM = "mute-union-6f3f.cloudflareaccess.com"
+ACCESS_AUD = "6f518bd8d8bde103168f9a09c47a469c743362021698538c09c0b6b7e1ac9976"
 
 [[d1_databases]]
 binding = "DB"
