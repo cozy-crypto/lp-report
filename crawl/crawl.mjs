@@ -2,7 +2,7 @@
 // → each wallet's 365-day report → data/leaderboard.json, served by GitHub Pages next to the site.
 // Run: node crawl/crawl.mjs   (env: POOLS, WALLETS, RPC)
 import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
-import { report, mapLimited, DAYS } from '../meteora.js';
+import { report, mapLimited, setRequestGap, DAYS } from '../meteora.js';
 
 const POOLS = Number(process.env.POOLS ?? 40);      // busiest pools by 24h fees, TVL ≥ $100k
 const WALLETS = Number(process.env.WALLETS ?? 1500);
@@ -46,6 +46,7 @@ async function owners(pool) {
 const median = xs => { const s = [...xs].sort((a, b) => a - b); return s.length ? s[Math.floor(s.length / 2)] : undefined; };
 const round = (v, d = 0) => (v === undefined ? null : Math.round(v * 10 ** d) / 10 ** d);
 
+setRequestGap(60); // ~16 requests/s, half of Meteora's 30/s limit
 const started = Date.now();
 const pools = await busiestPools();
 const seen = new Map(); // wallet → open positions across crawled pools

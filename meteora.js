@@ -7,9 +7,15 @@ const PARALLEL = 8; // Meteora allows 30 requests/s
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-async function get(url, retries = 3) {
+// Requests are spaced at least `gap` ms apart across the whole process. The site doesn't need it (one wallet
+// at a time); the crawler sets it so thousands of wallets stay under Meteora's rate limit.
+let gap = 0, nextSlot = 0;
+export const setRequestGap = ms => { gap = ms; };
+
+async function get(url, retries = 5, wait = 1000) {
+  if (gap) { const at = Math.max(Date.now(), nextSlot); nextSlot = at + gap; await sleep(at - Date.now()); }
   const r = await fetch(url);
-  if ((r.status === 429 || r.status >= 500) && retries) { await sleep(1500); return get(url, retries - 1); }
+  if ((r.status === 429 || r.status >= 500) && retries) { await sleep(wait); return get(url, retries - 1, Math.min(wait * 2, 16000)); }
   if (!r.ok) throw new Error(`Meteora API ${r.status}`);
   return r.json();
 }
