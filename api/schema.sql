@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS waitlist (
   deposited_usd REAL,
   code       TEXT UNIQUE,              -- own referral code: shouldaheld.com/?j=<code>
   referred_by TEXT,                    -- code of whoever brought them
+  owns_wallet INTEGER NOT NULL DEFAULT 0, -- said the checked wallet is theirs (self-declared)
   created_at TEXT NOT NULL
 );
 

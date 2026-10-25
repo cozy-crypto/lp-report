@@ -10,7 +10,9 @@ let lastResult = {}; // wallet and result sent along with a waitlist signup or a
 const $ = id => document.getElementById(id);
 
 
-function verdict(s) {
+function verdict(s, me = true) {
+  if (!me) return verdict(s).replace('You kept most of the fees you earned', 'This wallet kept most of the fees it earned')
+    .replace('the fees you earned', 'the fees it earned').replace('cost you more than your fees', 'cost it more than its fees');
   if (!s.rows.length) return 'No Meteora DLMM positions found for this wallet in the last 365 days.';
   const k = s.feesKept;
   if (k === undefined) return s.vsHodl >= 0 ? 'Liquidity did a little better than holding.' : 'Holding would have done a little better.';
@@ -32,7 +34,6 @@ function benchmark(s, b) {
 function render(s, user, b) {
   const bench = benchmark(s, b);
   const set = (id, v, cls = '') => { $(id).textContent = v; $(id).className = cls; };
-  $('verdict').textContent = verdict(s);
   $('full').hidden = !s.rows.length;
   set('hero', pct(s.feesKept), 'big ' + tone(s.feesKept ?? s.vsHodl));
   set('pnl', signed(s.pnlUsd), tone(s.pnlUsd));
@@ -59,21 +60,13 @@ function render(s, user, b) {
   $('rows-note').textContent = s.rows.length > 10 ? `Best 5 and worst 5 of ${s.rows.length} pools.` : '';
 
   lastResult = { wallet: user, feesKept: s.feesKept, feesUsd: s.feesUsd, lpUsd: s.vsHodl, depositedUsd: s.depositedUsd };
-  mine = s;
-  const rank = topShare(bench);
-  cardKind = rank ? 'rank' : 'receipt';
-  // Good results tag Meteora (they may repost wins on their pools); bad ones don't, nobody reposts a loss about themselves.
-  shareText = rank
-    ? `Kept ${pct(s.feesKept)} of my LP fees after price moves: top ${rank} of @MeteoraAG LPs.\n\nWhere do you rank? 🦝 via @shouldaheld`
-    : s.feesKept === undefined
-    ? `Liquidity earned me ${signed(s.vsHodl)} after price moves.\n\nGet your receipt 🦝 via @shouldaheld`
-    : s.feesKept >= 0.5
-    ? `I kept ${pct(s.feesKept)} of my @MeteoraAG LP fees after price moves (${signed(s.vsHodl)} from liquidity).\n\nHow much of yours did you keep? 🦝 via @shouldaheld`
-    : `My PnL said one thing. My LP receipt says I kept ${pct(s.feesKept)} of my fees after price moves. ${s.feesKept >= 0 ? 'Could be worse.' : 'Shoulda held.'}\n\nGet yours 🦝 via @shouldaheld`;
-  $('share-x').href = intent(shareText, `${location.origin}${location.pathname}?wallet=${user}`); // fallback if the card upload fails
+  mine = s; current = { s, bench, user };
+  // Anyone can paste any wallet, so texts stay third-person until the visitor says it's theirs.
+  // The example and a wallet opened from someone's shared card are never the visitor's.
+  owner = user === EXAMPLE || (REF && user === params.get('wallet')) ? false : null;
+  $('owner').hidden = owner === false;
   $('duel-result').hidden = true;
-  drawCard(s, bench);
-  renderWaitlist(s);
+  applyOwner();
   $('shared').hidden = !(REF && user === params.get('wallet'));
   $('intro').hidden = true;
   $('top').classList.add('compact');
@@ -81,6 +74,38 @@ function render(s, user, b) {
 }
 
 let shareText = '', cardKind = 'receipt', mine = null, duelText = '';
+let owner = null, current = null; // owner: true = the visitor said this wallet is theirs
+
+// Everything that says "I" or pitches earning from the wallet depends on whose wallet it is.
+function applyOwner() {
+  const { s, bench, user } = current;
+  const me = owner === true;
+  lastResult.owner = me;
+  $('verdict').textContent = verdict(s, me);
+  const rank = topShare(bench);
+  cardKind = rank ? 'rank' : 'receipt';
+  const k = pct(s.feesKept), lp = signed(s.vsHodl), end = s.feesKept >= 0 ? 'Could be worse.' : 'Shoulda held.';
+  // Good results tag Meteora (they may repost wins on their pools); bad ones don't.
+  shareText = me
+    ? rank ? `Kept ${k} of my LP fees after price moves: top ${rank} of @MeteoraAG LPs.\n\nWhere do you rank? 🦝 via @shouldaheld`
+      : s.feesKept === undefined ? `Liquidity earned me ${lp} after price moves.\n\nGet your receipt 🦝 via @shouldaheld`
+      : s.feesKept >= 0.5 ? `I kept ${k} of my @MeteoraAG LP fees after price moves (${lp} from liquidity).\n\nHow much of yours did you keep? 🦝 via @shouldaheld`
+      : `My PnL said one thing. My LP receipt says I kept ${k} of my fees after price moves. ${end}\n\nGet yours 🦝 via @shouldaheld`
+    : rank ? `This wallet kept ${k} of its LP fees after price moves: top ${rank} of @MeteoraAG LPs.\n\nWhere do you rank? 🦝 via @shouldaheld`
+      : s.feesKept === undefined ? `Liquidity earned this wallet ${lp} after price moves.\n\nCheck yours 🦝 via @shouldaheld`
+      : s.feesKept >= 0.5 ? `This LP kept ${k} of their @MeteoraAG LP fees after price moves (${lp} from liquidity).\n\nHow much of yours do you keep? 🦝 via @shouldaheld`
+      : `This LP's receipt: they kept ${k} of their fees after price moves. ${end}\n\nCheck yours 🦝 via @shouldaheld`;
+  $('share-x').href = intent(shareText, `${location.origin}${location.pathname}?wallet=${user}`); // fallback if the card upload fails
+  drawCard(s, bench);
+  renderWaitlist(s);
+}
+
+function setOwner(me) {
+  owner = me;
+  $('owner').hidden = true;
+  action('owner', { mine: me });
+  applyOwner();
+}
 const intent = (text, url) => `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
 // "12%" when the wallet is in the better half of ranked LPs: a brag people actually post.
 const topShare = bench => (bench && bench.beat >= 0.5 ? `${Math.max(1, Math.round((1 - bench.beat) * 100))}%` : null);
@@ -120,13 +145,17 @@ async function runDuel(e) {
     const k = x => x.feesKept ?? -Infinity;
     const win = k(mine) === k(them) ? 'tie' : k(mine) > k(them) ? 'me' : 'them';
     const row = (label, a, b, f, cls) => `<tr><td>${label}</td><td class="${cls ? tone(a ?? 0) : ''}">${f(a)}</td><td class="${cls ? tone(b ?? 0) : ''}">${f(b)}</td></tr>`;
-    $('duel-head').innerHTML = `<tr><th></th><th>You</th><th>${name}</th></tr>`;
+    const me = owner ? 'You' : `${lastResult.wallet.slice(0, 4)}…${lastResult.wallet.slice(-4)}`;
+    $('duel-head').innerHTML = `<tr><th></th><th>${me}</th><th>${name}</th></tr>`;
     $('duel-rows').innerHTML = row('Fees kept', mine.feesKept, them.feesKept, pct, true)
       + row('Liquidity', mine.vsHodl, them.vsHodl, signed, true) + row('Fees earned', mine.feesUsd, them.feesUsd, usd)
       + row('Deposited', mine.depositedUsd, them.depositedUsd, usd);
-    $('duel-verdict').textContent = win === 'tie' ? 'A tie.' : win === 'me' ? 'You kept more of your fees.' : `${name} kept more of their fees.`;
-    duelText = `My LP receipt vs ${name}: I kept ${pct(mine.feesKept)} of my fees after price moves, ${handle ? 'they' : 'this wallet'} kept ${pct(them.feesKept)}. `
-      + `${win === 'me' ? 'Shoulda held? Not me.' : win === 'them' ? 'Fine. You win this one.' : 'Dead even.'} \n\nCompare yours 🦝 via @shouldaheld`;
+    $('duel-verdict').textContent = win === 'tie' ? 'A tie.' : win === 'me' ? `${owner ? 'You' : me} kept more of ${owner ? 'your' : 'its'} fees.` : `${name} kept more of their fees.`;
+    const ending = owner ? (win === 'me' ? 'Shoulda held? Not me.' : win === 'them' ? 'Fine. You win this one.' : 'Dead even.') : '';
+    duelText = (owner
+      ? `My LP receipt vs ${name}: I kept ${pct(mine.feesKept)} of my fees after price moves, ${handle ? 'they' : 'this wallet'} kept ${pct(them.feesKept)}. ${ending}`
+      : `LP receipts, ${me} vs ${name}: ${pct(mine.feesKept)} vs ${pct(them.feesKept)} of fees kept after price moves.`)
+      + '\n\nCompare yours 🦝 via @shouldaheld';
     drawDuel(mine, them, name, win);
     $('duel-result').hidden = false;
     action('duel', { win, handle: !!handle });
@@ -139,7 +168,7 @@ async function runDuel(e) {
 
 // Strong LPs are pitched the leader side, everyone else the copying side.
 function renderWaitlist(s) {
-  const lead = s.feesKept >= 0.5;
+  const lead = owner === true && s.feesKept >= 0.5; // only an owner can be copied and paid
   $('wl-title').textContent = lead ? 'You kept most of your fees. Want to get paid for it?' : 'Want to copy LPs who keep their fees?';
   $('wl-text').textContent = lead
     ? "We're building copy-LP: others follow your positions automatically, and you earn a share of the fees they make."
@@ -190,7 +219,8 @@ function drawCard(s, bench) {
   const good = (s.feesKept ?? s.vsHodl) >= 0;
   g.fillStyle = '#0d1117'; g.fillRect(0, 0, 1200, 630);
   g.fillStyle = '#8b949e'; g.font = '500 34px system-ui, sans-serif';
-  g.fillText(measured ? 'LP fees I kept after price moves' : 'What liquidity earned me', 80, 140);
+  g.fillText(measured ? (owner ? 'LP fees I kept after price moves' : 'LP fees this wallet kept after price moves')
+    : (owner ? 'What liquidity earned me' : 'What liquidity earned this wallet'), 80, 140);
   g.fillStyle = good ? '#3fb950' : '#f85149'; g.font = '700 150px system-ui, sans-serif';
   g.fillText(measured ? pct(s.feesKept) : signed(s.vsHodl), 80, 320);
   g.fillStyle = '#e6edf3'; g.font = '400 34px system-ui, sans-serif';
@@ -222,7 +252,7 @@ function drawDuel(a, b, name, win) {
     g.fillStyle = '#8b949e'; g.font = '500 36px system-ui, sans-serif'; g.fillText(label, x, 220);
     g.fillStyle = (v ?? 0) >= 0 ? '#3fb950' : '#f85149'; g.font = `${won ? 800 : 600} 130px system-ui, sans-serif`; g.fillText(pct(v), x, 370);
   };
-  side(80, 'Me', a.feesKept, win === 'me');
+  side(80, owner ? 'Me' : `${lastResult.wallet.slice(0, 4)}…${lastResult.wallet.slice(-4)}`, a.feesKept, win === 'me');
   side(640, name, b.feesKept, win === 'them');
   g.fillStyle = '#e6edf3'; g.font = '700 46px system-ui, sans-serif'; g.fillText('vs', 560, 330);
   g.fillStyle = '#8b949e'; g.font = '400 26px system-ui, sans-serif';
@@ -264,6 +294,8 @@ $('example').addEventListener('click', e => {
   run(EXAMPLE);
 });
 $('share-x').addEventListener('click', shareOnX);
+$('owner-yes').addEventListener('click', () => setOwner(true));
+$('owner-no').addEventListener('click', () => setOwner(false));
 $('duel-form').addEventListener('submit', runDuel);
 $('duel-share').addEventListener('click', e => {
   e.preventDefault();

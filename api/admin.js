@@ -6,7 +6,7 @@ import { buildStats } from './stats.js';
 // Who to talk to first. Thresholds are a first guess, tune them once real leads come in.
 export function segments(l) {
   return [
-    l.fees_kept >= 0.5 && l.fees_usd >= 500 && 'leader candidate',
+    l.owns_wallet && l.fees_kept >= 0.5 && l.fees_usd >= 500 && 'leader candidate', // ponytail: self-declared until wallet signing exists
     (l.fees_usd >= 5000 || l.deposited_usd >= 50000) && 'big LP',
     l.role === 'copy' && 'wants to copy',
     l.role === 'lead' && 'wants to lead',
@@ -157,7 +157,7 @@ async function page(env, email) {
 
 <h2>Leads (${leads.length}) <small><a href="/leads.csv">Download CSV</a></small></h2>
 <div class="cards">${['leader candidate', 'big LP', 'wants to copy', 'wants to lead'].map(s => `<div class="card"><span class="muted">${s}</span><b>${segCount(s)}</b></div>`).join('')}</div>
-<p class="muted">Leader candidate: kept 50%+ of fees with $500+ earned. Big LP: $5,000+ fees or $50,000+ deposited. Sorted: leader candidates first, then by fees.</p>
+<p class="muted">Leader candidate: says the wallet is theirs, kept 50%+ of fees with $500+ earned. Big LP: $5,000+ fees or $50,000+ deposited. Sorted: leader candidates first, then by fees.</p>
 <div class="wrap"><table><thead><tr><th>Contact</th><th>Wants</th><th>Segments</th><th>Fees kept</th><th>Fees</th><th>Deposited</th><th>Wallet</th><th>Joined</th></tr></thead>
 <tbody>${sorted.map(leadRow).join('') || '<tr><td colspan="8" class="muted">No leads yet</td></tr>'}</tbody></table></div>
 </main></body></html>`, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } });

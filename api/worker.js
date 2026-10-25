@@ -74,17 +74,19 @@ async function waitlist(req, env, json) {
   const contact = email || `@${x.toLowerCase()}`;
   const wallet = WALLET.test(b.wallet ?? '') ? b.wallet : null;
   const referredBy = CODE.test(b.referredBy ?? '') ? b.referredBy : null;
-  const meta = JSON.stringify({ referredBy, source: typeof b.source === 'string' ? b.source.slice(0, 64) : null, country: req.cf?.country });
+  const owns = b.owner === true ? 1 : 0; // the visitor said the checked wallet is theirs (not verified)
+  const meta = JSON.stringify({ referredBy, owns, source: typeof b.source === 'string' ? b.source.slice(0, 64) : null, country: req.cf?.country });
   // Signing up again keeps the first code, referrer and join date; it updates the role and latest result.
   await env.DB.batch([
     env.DB.prepare(
-      `INSERT INTO waitlist (contact, email, x, role, wallet, fees_kept, fees_usd, deposited_usd, code, referred_by, created_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+      `INSERT INTO waitlist (contact, email, x, role, wallet, fees_kept, fees_usd, deposited_usd, code, referred_by, owns_wallet, created_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?12, ?11)
        ON CONFLICT(contact) DO UPDATE SET x = COALESCE(excluded.x, x), role = excluded.role,
          wallet = COALESCE(excluded.wallet, wallet), fees_kept = COALESCE(excluded.fees_kept, fees_kept),
          fees_usd = COALESCE(excluded.fees_usd, fees_usd), deposited_usd = COALESCE(excluded.deposited_usd, deposited_usd),
-         code = COALESCE(code, excluded.code), referred_by = COALESCE(referred_by, excluded.referred_by)`,
-    ).bind(contact, email || null, x || null, b.role, wallet, num(b.feesKept), num(b.feesUsd), num(b.depositedUsd), newCode(), referredBy, now()),
+         code = COALESCE(code, excluded.code), referred_by = COALESCE(referred_by, excluded.referred_by),
+         owns_wallet = CASE WHEN excluded.wallet IS NULL THEN owns_wallet ELSE excluded.owns_wallet END`,
+    ).bind(contact, email || null, x || null, b.role, wallet, num(b.feesKept), num(b.feesUsd), num(b.depositedUsd), newCode(), referredBy, now(), owns),
     env.DB.prepare('INSERT INTO events (type, wallet_hash, fees_kept, fees_usd, meta, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)')
       .bind('signup', wallet && await hashWallet(wallet), num(b.feesKept), num(b.feesUsd), meta, now()),
   ]);

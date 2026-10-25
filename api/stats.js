@@ -43,7 +43,7 @@ export async function buildStats(env) {
        FROM (SELECT wallet_hash, json_extract(meta, '$.depositedUsd') AS d FROM events
              WHERE type = 'check' AND ${OK} AND created_at >= ?1) GROUP BY bucket`, since30),
     q(`SELECT count(*) AS total, sum(role = 'copy') AS wantCopy, sum(role = 'lead') AS wantLead, sum(role = 'curious') AS curious,
-         sum(fees_kept >= 0.5 AND fees_usd >= 500) AS leaderCandidates, sum(fees_usd >= 5000 OR deposited_usd >= 50000) AS bigLps,
+         sum(owns_wallet AND fees_kept >= 0.5 AND fees_usd >= 500) AS leaderCandidates, sum(owns_wallet) AS ownWallet, sum(fees_usd >= 5000 OR deposited_usd >= 50000) AS bigLps,
          sum(referred_by IS NOT NULL) AS referred FROM waitlist`),
     q(`SELECT json_extract(meta, '$.name') AS action, count(*) AS n FROM events
        WHERE type = 'action' AND created_at >= ?1 GROUP BY action ORDER BY n DESC`, since7),

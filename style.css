@@ -63,6 +63,8 @@ button:disabled { opacity: .6; cursor: wait; }
 .shared { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--accent); border-radius: 12px; padding: 12px 16px; margin-bottom: 24px; }
 #verdict { font-size: 26px; font-weight: 700; line-height: 1.25; margin: 0 0 20px; }
 #scope, #unpriced { margin: 22px 0 0; }
+.owner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: -6px 0 20px; color: var(--muted); }
+.owner .btn { padding: 8px 14px; font-size: 15px; }
 .bench { display: flex; gap: 16px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; margin: 28px 0 0; }
 .bench b { font-size: 36px; color: var(--accent); font-variant-numeric: tabular-nums; }
 .bench p { margin: 0; color: var(--muted); }
