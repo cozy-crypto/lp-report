@@ -24,4 +24,4 @@ jobs:
           git config user.email "hello@shouldaheld.com"
           git add data/leaderboard.json
           git diff --cached --quiet || git commit -m "Leaderboard $(date -u +%F)"
-          git push
+          git pull --rebase && git push   # site commits may land while the crawl runs
