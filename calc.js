@@ -32,8 +32,12 @@ export const feesKept = (lpResult, fees) => (fees >= MIN_FEES_USD ? lpResult / f
 
 // pools: [{ address, name, today: {x, y}, positions: [...] }] → per-pool rows, best first, plus totals.
 // PnL in dollars splits into the market (what holding the same tokens would have done) and liquidity (vsHodl).
-export function summarize(pools) {
-  const rows = pools.map(p => {
+// Only open positions and those closed at or after `since` (unix seconds) count: a pool active this year
+// also returns its older positions.
+export function summarize(pools, since = -Infinity) {
+  const kept = pools.map(p => ({ ...p, positions: p.positions.filter(q => q.open || !(q.closedAt < since)) }));
+  const all = kept.flatMap(p => p.positions);
+  const rows = kept.map(p => {
     const sum = f => p.positions.reduce((s, q) => s + f(q), 0);
     const open = p.positions.some(q => q.open);
     return {
@@ -54,5 +58,8 @@ export function summarize(pools) {
     priceCostUsd: vsHodl - feesUsd,
     feesKept: feesKept(vsHodl, feesUsd),
     unpriced: rows.filter(r => !r.priced).length,
+    positions: all.length,
+    openPositions: all.filter(q => q.open).length,
+    firstAt: all.length ? Math.min(...all.map(q => q.createdAt)) : undefined,
   };
 }

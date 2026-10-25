@@ -6,7 +6,7 @@ import { SITE, esc, usd, pct } from './util.js';
 export function segments(l) {
   return [
     l.fees_kept >= 0.5 && l.fees_usd >= 500 && 'leader candidate',
-    l.fees_usd >= 5000 && 'big LP',
+    (l.fees_usd >= 5000 || l.deposited_usd >= 50000) && 'big LP',
     l.role === 'copy' && 'wants to copy',
     l.role === 'lead' && 'wants to lead',
   ].filter(Boolean);
@@ -44,12 +44,14 @@ async function accessEmail(req, env) {
 
 const leadsQuery = env => env.DB.prepare('SELECT * FROM waitlist ORDER BY created_at DESC').all().then(r => r.results);
 const priority = l => (segments(l).includes('leader candidate') ? 1e12 : 0) + (l.fees_usd ?? 0);
+// A failed check (Meteora down, bad data) is stored as a check with meta.error; everything else skips those.
+const OK = "json_extract(meta, '$.error') IS NULL";
 
 async function leadsCsv(env) {
   const leads = (await leadsQuery(env)).sort((a, b) => priority(b) - priority(a));
   const cell = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const rows = [['contact', 'email', 'x', 'role', 'segments', 'fees_kept', 'fees_usd', 'wallet', 'created_at'],
-    ...leads.map(l => [l.contact, l.email, l.x, l.role, segments(l).join('; '), l.fees_kept, l.fees_usd, l.wallet, l.created_at])];
+  const rows = [['contact', 'email', 'x', 'role', 'segments', 'fees_kept', 'fees_usd', 'deposited_usd', 'wallet', 'created_at'],
+    ...leads.map(l => [l.contact, l.email, l.x, l.role, segments(l).join('; '), l.fees_kept, l.fees_usd, l.deposited_usd, l.wallet, l.created_at])];
   return new Response(rows.map(r => r.map(cell).join(',')).join('\n'), {
     headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="shouldaheld-leads.csv"' },
   });
@@ -57,15 +59,25 @@ async function leadsCsv(env) {
 
 async function page(env, email) {
   const day = n => new Date(Date.now() - n * 864e5).toISOString();
-  const [week, all, daily, kept, leads] = await Promise.all([
+  const q = (sql, ...args) => env.DB.prepare(sql).bind(...args).all().then(r => r.results);
+  const [week, all, daily, kept, leads, sources, sizes, [stats]] = await Promise.all([
     funnel(env, day(7)),
     funnel(env, '0'),
     env.DB.prepare(`SELECT substr(created_at, 1, 10) AS d, type, count(*) AS n FROM events
-      WHERE created_at >= ?1 GROUP BY d, type ORDER BY d DESC`).bind(day(14)).all().then(r => r.results),
+      WHERE created_at >= ?1 AND (type != 'check' OR ${OK}) GROUP BY d, type ORDER BY d DESC`).bind(day(14)).all().then(r => r.results),
     env.DB.prepare(`SELECT CASE WHEN fees_kept IS NULL THEN 'too few fees' WHEN fees_kept < 0 THEN 'below 0%'
       WHEN fees_kept < 0.5 THEN '0–49%' WHEN fees_kept < 1 THEN '50–99%' ELSE '100%+' END AS bucket,
-      count(DISTINCT wallet_hash) AS wallets FROM events WHERE type = 'check' GROUP BY bucket`).all().then(r => r.results),
+      count(DISTINCT wallet_hash) AS wallets FROM events WHERE type = 'check' AND ${OK} GROUP BY bucket`).all().then(r => r.results),
     leadsQuery(env),
+    q(`SELECT json_extract(meta, '$.from') AS src, count(*) AS n FROM events WHERE type = 'visit' AND created_at >= ?1
+      GROUP BY src ORDER BY n DESC LIMIT 15`, day(7)),
+    q(`SELECT CASE WHEN d IS NULL THEN 'unknown' WHEN d < 1000 THEN 'under $1k' WHEN d < 10000 THEN '$1k–10k'
+      WHEN d < 100000 THEN '$10k–100k' ELSE '$100k+' END AS bucket, count(DISTINCT wallet_hash) AS wallets
+      FROM (SELECT wallet_hash, json_extract(meta, '$.depositedUsd') AS d FROM events WHERE type = 'check' AND ${OK}) GROUP BY bucket`),
+    q(`SELECT sum(type = 'visit' AND json_extract(meta, '$.mobile')) AS mobile, sum(type = 'visit') AS visits,
+      sum(type = 'check' AND json_extract(meta, '$.own')) AS own, sum(type = 'check' AND ${OK}) AS checks,
+      sum(type = 'check' AND NOT ${OK}) AS errors, avg(CASE WHEN type = 'check' THEN json_extract(meta, '$.ms') END) AS ms
+      FROM events WHERE created_at >= ?1`, day(7)),
   ]);
 
   const rate = (a, b) => (b ? `${Math.round((a / b) * 100)}%` : '—');
@@ -81,7 +93,7 @@ async function page(env, email) {
   const who = l => [l.email && esc(l.email), l.x && `<a href="https://x.com/${esc(l.x)}" target="_blank">@${esc(l.x)}</a>`].filter(Boolean).join('<br>');
   const leadRow = l => `<tr><td>${who(l)}</td><td>${esc(l.role)}</td>
     <td>${segments(l).map(s => `<span class="tag">${s}</span>`).join(' ')}</td>
-    <td>${pct(l.fees_kept)}</td><td>${l.fees_usd == null ? '—' : usd(l.fees_usd)}</td>
+    <td>${pct(l.fees_kept)}</td><td>${l.fees_usd == null ? '—' : usd(l.fees_usd)}</td><td>${l.deposited_usd == null ? '—' : usd(l.deposited_usd)}</td>
     <td>${l.wallet ? `<a href="${SITE}/?wallet=${esc(l.wallet)}" target="_blank">${esc(l.wallet.slice(0, 4))}…${esc(l.wallet.slice(-4))}</a>` : '—'}</td>
     <td>${esc(l.created_at.slice(0, 10))}</td></tr>`;
 
@@ -107,20 +119,36 @@ async function page(env, email) {
 <div class="wrap"><table><thead><tr><th>Day</th><th>Visits</th><th>Checks</th><th>Shares</th><th>Signups</th></tr></thead>
 <tbody>${days.map(d => `<tr><td>${d}</td><td>${dayCount(d, 'visit')}</td><td>${dayCount(d, 'check')}</td><td>${dayCount(d, 'share')}</td><td>${dayCount(d, 'signup')}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">No events yet</td></tr>'}</tbody></table></div>
 
+<h2>Last 7 days at a glance</h2>
+<div class="cards">${[
+    ['Mobile visits', rate(stats.mobile ?? 0, stats.visits)],
+    ['Checks of own wallet', rate(stats.own ?? 0, stats.checks)],
+    ['Failed checks', stats.errors ?? 0],
+    ['Avg check time', stats.ms == null ? '—' : `${(stats.ms / 1000).toFixed(1)}s`],
+  ].map(([k, v]) => `<div class="card"><span class="muted">${k}</span><b>${v}</b></div>`).join('')}</div>
+
+<h2>Where visits came from, last 7 days</h2>
+<div class="wrap"><table><thead><tr><th>Source</th><th>Visits</th></tr></thead>
+<tbody>${sources.map(r => `<tr><td>${esc(r.src ?? 'unknown')}</td><td>${r.n}</td></tr>`).join('') || '<tr><td colspan="2" class="muted">No visits yet</td></tr>'}</tbody></table></div>
+
+<h2>Checked wallets by size deposited</h2>
+<div class="cards">${['under $1k', '$1k–10k', '$10k–100k', '$100k+', 'unknown'].map(b => `<div class="card"><span class="muted">${b}</span><b>${sizes.find(r => r.bucket === b)?.wallets ?? 0}</b></div>`).join('')}</div>
+
 <h2>Checked wallets by fees kept</h2>
 <div class="cards">${['below 0%', '0–49%', '50–99%', '100%+', 'too few fees'].map(b => `<div class="card"><span class="muted">${b}</span><b>${kept.find(r => r.bucket === b)?.wallets ?? 0}</b></div>`).join('')}</div>
 
 <h2>Leads (${leads.length}) <small><a href="/leads.csv">Download CSV</a></small></h2>
 <div class="cards">${['leader candidate', 'big LP', 'wants to copy', 'wants to lead'].map(s => `<div class="card"><span class="muted">${s}</span><b>${segCount(s)}</b></div>`).join('')}</div>
-<p class="muted">Leader candidate: kept 50%+ of fees with $500+ earned. Big LP: $5,000+ fees. Sorted: leader candidates first, then by fees.</p>
-<div class="wrap"><table><thead><tr><th>Contact</th><th>Wants</th><th>Segments</th><th>Fees kept</th><th>Fees</th><th>Wallet</th><th>Joined</th></tr></thead>
-<tbody>${sorted.map(leadRow).join('') || '<tr><td colspan="7" class="muted">No leads yet</td></tr>'}</tbody></table></div>
+<p class="muted">Leader candidate: kept 50%+ of fees with $500+ earned. Big LP: $5,000+ fees or $50,000+ deposited. Sorted: leader candidates first, then by fees.</p>
+<div class="wrap"><table><thead><tr><th>Contact</th><th>Wants</th><th>Segments</th><th>Fees kept</th><th>Fees</th><th>Deposited</th><th>Wallet</th><th>Joined</th></tr></thead>
+<tbody>${sorted.map(leadRow).join('') || '<tr><td colspan="8" class="muted">No leads yet</td></tr>'}</tbody></table></div>
 </main></body></html>`, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } });
 }
 
 async function funnel(env, since) {
   const rows = (await env.DB.prepare(`SELECT type, count(*) AS n, count(DISTINCT wallet_hash) AS wallets,
-    sum(type = 'visit' AND ref IS NOT NULL) AS from_shares FROM events WHERE created_at >= ?1 GROUP BY type`).bind(since).all()).results;
+    sum(type = 'visit' AND ref IS NOT NULL) AS from_shares FROM events WHERE created_at >= ?1 AND (type != 'check' OR ${OK})
+    GROUP BY type`).bind(since).all()).results;
   const get = t => rows.find(r => r.type === t) ?? {};
   return {
     visit: get('visit').n ?? 0, check: get('check').n ?? 0, wallets: get('check').wallets ?? 0,

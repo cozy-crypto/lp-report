@@ -2,6 +2,7 @@ import { num, summarize } from './calc.js';
 
 const API = 'https://dlmm.datapi.meteora.ag';
 const WALLET = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const DAYS = 365;
 const PARALLEL = 8; // Meteora allows 30 requests/s
 const EXAMPLE = 'Abaqj8ivq6Uoinc9CQiiZ9GQNDB2RFSWqhpJKf9mN6Gu'; // an active public Meteora LP wallet
 const BACKEND = location.hostname === 'localhost' ? 'http://127.0.0.1:8788' : 'https://api.shouldaheld.com';
@@ -45,7 +46,7 @@ async function poolList(path) {
 }
 
 const toPosition = q => ({
-  open: !q.isClosed, minPrice: num(q.minPrice), maxPrice: num(q.maxPrice),
+  open: !q.isClosed, createdAt: q.createdAt, closedAt: q.closedAt, minPrice: num(q.minPrice), maxPrice: num(q.maxPrice),
   deposited: { x: num(q.allTimeDeposits.tokenX.amount), y: num(q.allTimeDeposits.tokenY.amount) },
   withdrawn: { x: num(q.allTimeWithdrawals.tokenX.amount), y: num(q.allTimeWithdrawals.tokenY.amount) },
   withdrawnUsd: { x: num(q.allTimeWithdrawals.tokenX.usd), y: num(q.allTimeWithdrawals.tokenY.usd) },
@@ -69,7 +70,7 @@ async function pool(address, name, user) {
 
 async function report(user, progress) {
   const [closed, open] = await Promise.all([
-    poolList(`/portfolio?user=${user}&days_back=365`),
+    poolList(`/portfolio?user=${user}&days_back=${DAYS}`),
     poolList(`/portfolio/open?user=${user}`),
   ]);
   const names = new Map([...closed, ...open].map(p => [p.poolAddress, `${p.tokenX}-${p.tokenY}`]));
@@ -79,7 +80,7 @@ async function report(user, progress) {
     progress(++done, names.size);
     return p;
   });
-  return summarize(pools);
+  return summarize(pools, Date.now() / 1000 - DAYS * 86400);
 }
 
 const pct = k => (k === undefined ? '—' : `${Math.round(k * 100)}%`);
@@ -105,7 +106,10 @@ function render(s, user) {
   set('lp', signed(s.vsHodl), tone(s.vsHodl));
   set('fees', signed(s.feesUsd));
   set('cost', signed(s.priceCostUsd));
-  $('scope').textContent = `${s.rows.length} pools · ${usd(s.depositedUsd)} deposited in total`;
+  const since = new Date(Date.now() - DAYS * 864e5).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const plural = (n, w) => `${n.toLocaleString('en-US')} ${w}${n === 1 ? '' : 's'}`;
+  $('scope').innerHTML = `${plural(s.positions, 'position')} in ${plural(s.rows.length, 'pool')}` +
+    `${s.openPositions ? ` (${s.openPositions} open)` : ''}<br>closed since ${since} · ${usd(s.depositedUsd)} deposited`;
   $('unpriced').hidden = !s.unpriced;
   $('unpriced').textContent = `${s.unpriced} open pool(s) hold tokens with no current price; those tokens count as $0.`;
 
@@ -115,7 +119,7 @@ function render(s, user) {
   $('rows').innerHTML = top.map(tr).join('');
   $('rows-note').textContent = s.rows.length > 10 ? `Best 5 and worst 5 of ${s.rows.length} pools.` : '';
 
-  lastResult = { wallet: user, feesKept: s.feesKept, feesUsd: s.feesUsd, lpUsd: s.vsHodl };
+  lastResult = { wallet: user, feesKept: s.feesKept, feesUsd: s.feesUsd, lpUsd: s.vsHodl, depositedUsd: s.depositedUsd };
   shareText = s.feesKept === undefined
     ? `Liquidity earned me ${signed(s.vsHodl)} after price moves. Get your receipt from @shouldaheld`
     : `I kept ${pct(s.feesKept)} of my LP fees after price moves: ${signed(s.vsHodl)} from liquidity, the rest of my PnL was the market. ${s.feesKept >= 0.5 ? 'Not bad.' : s.feesKept >= 0 ? 'Could be worse.' : 'Shoulda held.'} Get your receipt from @shouldaheld`;
@@ -202,11 +206,22 @@ async function run(user) {
   history.replaceState(null, '', `?wallet=${user}`);
   $('go').disabled = true; $('go').textContent = 'Checking…'; $('result').hidden = true;
   try {
-    const s = await report(user, (done, total) => { $('go').textContent = `Pools ${done}/${total}`; });
+    const started = Date.now();
+    let found = 0;
+    const s = await report(user, (done, total) => { found = total; $('go').textContent = `Reading pool ${done} of ${total}…`; });
     render(s, user);
-    track('check', { wallet: user, feesKept: s.feesKept, feesUsd: s.feesUsd, pools: s.rows.length });
+    track('check', {
+      wallet: user, feesKept: s.feesKept, feesUsd: s.feesUsd, pools: s.rows.length,
+      meta: {
+        positions: s.positions, open: s.openPositions, poolsFound: found, depositedUsd: Math.round(s.depositedUsd),
+        pnlUsd: Math.round(s.pnlUsd), lpUsd: Math.round(s.vsHodl), unpriced: s.unpriced,
+        lpDays: s.firstAt && Math.round(Date.now() / 864e5 - s.firstAt / 86400), ms: Date.now() - started,
+        own: user !== EXAMPLE && !(REF && user === params.get('wallet')), // typed their own wallet, not the example or a shared link
+      },
+    });
   } catch (e) {
     $('error').textContent = `Could not load data: ${e.message}. Try again in a minute.`;
+    track('check', { wallet: user, meta: { error: e.message } });
   } finally {
     $('go').disabled = false; $('go').textContent = 'Get my receipt';
   }
@@ -230,6 +245,12 @@ $('check-own').addEventListener('click', () => {
   $('wallet').focus();
 });
 
-track('visit');
+// Where the visit came from and on what, for the admin. No IPs, no cookies.
+track('visit', {
+  meta: {
+    from: params.get('utm_source') || (document.referrer && new URL(document.referrer).hostname) || 'direct',
+    mobile: matchMedia('(max-width: 640px)').matches, lang: navigator.language,
+  },
+});
 const fromUrl = params.get('wallet');
 if (fromUrl) { $('wallet').value = fromUrl; run(fromUrl); }

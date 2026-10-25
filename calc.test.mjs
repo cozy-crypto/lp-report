@@ -55,4 +55,13 @@ near(m.marketUsd, 500);
 near(m.priceCostUsd, -80);
 near(m.feesKept, -50 / 30);
 
+// Period: positions closed before `since` drop out, open ones always stay; meta counts what's left.
+const old = pos({ closedAt: 50, createdAt: 10, depositedUsd: 100, feesUsd: 99, deposited: { x: 1, y: 0 }, withdrawn: { x: 1, y: 0 }, withdrawnUsd: { x: 100, y: 0 } });
+const recent = { ...closed, closedAt: 150, createdAt: 120 };
+const p = summarize([{ address: 'f', name: 'SOL-USDC', today, positions: [old, recent, { ...open, createdAt: 140 }] }], 100);
+near(p.feesUsd, 20);
+assert.equal(p.positions, 2);
+assert.equal(p.openPositions, 1);
+assert.equal(p.firstAt, 120);
+
 console.log('calc ok');

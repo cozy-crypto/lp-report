@@ -59,12 +59,12 @@ async function waitlist(req, env, json) {
   const wallet = WALLET.test(b.wallet ?? '') ? b.wallet : null;
   await env.DB.batch([
     env.DB.prepare(
-      `INSERT INTO waitlist (contact, email, x, role, wallet, fees_kept, fees_usd, created_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+      `INSERT INTO waitlist (contact, email, x, role, wallet, fees_kept, fees_usd, deposited_usd, created_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
        ON CONFLICT(contact) DO UPDATE SET x = COALESCE(excluded.x, x), role = excluded.role,
          wallet = COALESCE(excluded.wallet, wallet), fees_kept = COALESCE(excluded.fees_kept, fees_kept),
-         fees_usd = COALESCE(excluded.fees_usd, fees_usd)`,
-    ).bind(contact, email || null, x || null, b.role, wallet, num(b.feesKept), num(b.feesUsd), now()),
+         fees_usd = COALESCE(excluded.fees_usd, fees_usd), deposited_usd = COALESCE(excluded.deposited_usd, deposited_usd)`,
+    ).bind(contact, email || null, x || null, b.role, wallet, num(b.feesKept), num(b.feesUsd), num(b.depositedUsd), now()),
     env.DB.prepare('INSERT INTO events (type, wallet_hash, fees_kept, fees_usd, created_at) VALUES (?1, ?2, ?3, ?4, ?5)')
       .bind('signup', wallet && await hashWallet(wallet), num(b.feesKept), num(b.feesUsd), now()),
   ]);
@@ -77,11 +77,13 @@ async function event(req, env, json) {
   try { b = JSON.parse(await req.text()); } catch { return json({ error: 'Invalid request' }, 400); }
   if (!['visit', 'check'].includes(b.type)) return json({ error: 'Unknown event' }, 400);
   const wallet = WALLET.test(b.wallet ?? '') ? b.wallet : null;
+  // Free-form extras (traffic source, positions, deposit size, load time…); capped so a bad client can't bloat rows.
+  const meta = b.meta && typeof b.meta === 'object' ? JSON.stringify(b.meta).slice(0, 1000) : null;
   await env.DB.prepare(
-    'INSERT INTO events (type, wallet_hash, fees_kept, fees_usd, pools, ref, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)',
+    'INSERT INTO events (type, wallet_hash, fees_kept, fees_usd, pools, ref, meta, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)',
   ).bind(
     b.type, wallet && await hashWallet(wallet), num(b.feesKept), num(b.feesUsd),
-    Number.isInteger(b.pools) ? b.pools : null, typeof b.ref === 'string' ? b.ref.slice(0, 32) : null, now(),
+    Number.isInteger(b.pools) ? b.pools : null, typeof b.ref === 'string' ? b.ref.slice(0, 32) : null, meta, now(),
   ).run();
   return json({ ok: true });
 }

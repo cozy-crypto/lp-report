@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS waitlist (
   wallet     TEXT,
   fees_kept  REAL,                     -- share of fees kept, 0.32 = 32%
   fees_usd   REAL,
+  deposited_usd REAL,
   created_at TEXT NOT NULL
 );
 
@@ -18,6 +19,7 @@ CREATE TABLE IF NOT EXISTS events (
   fees_usd    REAL,
   pools       INTEGER,
   ref         TEXT,                    -- where the visit came from: a card id or "x"
+  meta        TEXT,                    -- JSON extras: visit {from, mobile, lang}; check {positions, depositedUsd, ms, own, error…}
   created_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS events_type_time ON events (type, created_at);
