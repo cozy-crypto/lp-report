@@ -99,9 +99,8 @@ function render(s, user) {
   const set = (id, v, cls = '') => { $(id).textContent = v; $(id).className = cls; };
   $('verdict').textContent = verdict(s);
   $('full').hidden = !s.rows.length;
-  $('hero').textContent = pct(s.feesKept);
-  $('hero').className = 'hero ' + tone(s.feesKept ?? s.vsHodl);
-  set('pnl', signed(s.pnlUsd));
+  set('hero', pct(s.feesKept), 'big ' + tone(s.feesKept ?? s.vsHodl));
+  set('pnl', signed(s.pnlUsd), tone(s.pnlUsd));
   set('market', signed(s.marketUsd));
   set('lp', signed(s.vsHodl), tone(s.vsHodl));
   set('fees', signed(s.feesUsd));
@@ -125,6 +124,7 @@ function render(s, user) {
   renderWaitlist(s);
   $('shared').hidden = !(REF && user === params.get('wallet'));
   $('intro').hidden = true;
+  $('top').classList.add('compact');
   $('result').hidden = false;
 }
 
@@ -208,7 +208,7 @@ async function run(user) {
   } catch (e) {
     $('error').textContent = `Could not load data: ${e.message}. Try again in a minute.`;
   } finally {
-    $('go').disabled = false; $('go').textContent = 'Check';
+    $('go').disabled = false; $('go').textContent = 'Get my receipt';
   }
 }
 

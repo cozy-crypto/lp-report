@@ -5,143 +5,231 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Shoulda Held? — what liquidity actually earned you</title>
 <meta name="description" content="Your PnL includes the market. See what providing liquidity on Solana actually earned you, and how much of your fees you kept.">
+<link rel="icon" href="img/raccoon.png">
 <style>
-  :root { --bg: #0d1117; --panel: #161b22; --line: #30363d; --text: #e6edf3; --muted: #8b949e; --good: #3fb950; --bad: #f85149; --accent: #58a6ff; }
+  :root {
+    --bg: #0e1319; --panel: #161b22; --line: #2a313b; --text: #e6edf3; --muted: #8b949e;
+    --good: #3fb950; --bad: #f85149; --accent: #58a6ff;
+    --paper: #f4f1e8; --ink: #2b2a27; --ink-muted: #77736a; --ink-good: #1f7a34; --ink-bad: #c93a32;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, sans-serif; }
-  main { max-width: 760px; margin: 0 auto; padding: 48px 16px; }
-  h1 { font-size: 36px; line-height: 1.2; margin: 0 0 16px; }
-  h2 { font-size: 22px; margin: 40px 0 8px; }
-  .eyebrow { color: var(--accent); font-weight: 600; margin: 0 0 8px; }
-  .lead { font-size: 18px; color: var(--text); margin: 0; }
+  [hidden] { display: none !important; } /* layout rules below must not resurrect hidden blocks */
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  a { color: var(--accent); }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+  .narrow { max-width: 680px; margin: 0 auto; }
   .muted { color: var(--muted); }
-  .small { font-size: 14px; margin-top: 0; }
-  .small a { color: var(--accent); }
-  .compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 16px 0; }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 2px; }
-  .card b { font-size: 28px; }
-  .card.accent { border-color: var(--accent); }
-  .shared { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--accent); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; }
-  form { display: flex; gap: 8px; margin: 24px 0 8px; }
-  input { flex: 1; min-width: 0; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font: inherit; }
-  button, .btn { padding: 12px 18px; border-radius: 8px; border: 0; background: var(--accent); color: #0d1117; font: 600 16px system-ui, sans-serif; cursor: pointer; text-decoration: none; display: inline-block; }
+  .small { font-size: 14px; }
+
+  header { display: flex; align-items: center; justify-content: space-between; padding: 20px 0; }
+  .brand { display: flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; font-weight: 700; font-size: 18px; }
+  .brand img { width: 36px; height: 36px; border-radius: 50%; }
+  .xlink { color: var(--muted); text-decoration: none; font-size: 15px; }
+  .xlink:hover { color: var(--text); }
+
+  .hero { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 56px; align-items: center; padding: 48px 0 72px; }
+  .pill-label { display: inline-block; font-size: 13px; color: var(--accent); border: 1px solid rgba(88, 166, 255, .4); border-radius: 999px; padding: 3px 12px; margin-bottom: 20px; }
+  h1 { font-size: 52px; line-height: 1.08; letter-spacing: -0.02em; margin: 0 0 20px; }
+  h1 span { color: var(--good); }
+  .lead { font-size: 19px; color: var(--muted); margin: 0 0 28px; max-width: 34em; }
+
+  #form { display: flex; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 6px; }
+  #form:focus-within { border-color: var(--accent); }
+  #wallet { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--text); font: inherit; font-size: 16px; padding: 12px; outline: none; }
+  button, .btn { border: 0; border-radius: 8px; background: var(--accent); color: #0b0f14; font: 600 16px system-ui, sans-serif; padding: 12px 20px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; }
   button:disabled { opacity: .6; cursor: wait; }
-  .btn.secondary { background: var(--panel); color: var(--text); border: 1px solid var(--line); }
-  #error { color: var(--bad); min-height: 24px; }
-  .hero { font-size: 64px; font-weight: 700; margin: 4px 0 16px; }
-  .good { color: var(--good); } .bad { color: var(--bad); }
-  .receipt { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; font-variant-numeric: tabular-nums; }
-  .line { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; }
-  .line + .line { border-top: 1px dashed var(--line); }
-  .line.sub { padding-left: 16px; } .line.subsub { padding-left: 32px; color: var(--muted); }
-  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .btn.secondary { background: transparent; color: var(--text); border: 1px solid var(--line); }
+  .trust { display: flex; gap: 16px; flex-wrap: wrap; font-size: 14px; color: var(--muted); margin-top: 12px; }
+  #error { color: var(--bad); min-height: 24px; margin-top: 8px; }
+
+  /* Paper receipt, used for the example and for the real result */
+  .paper { position: relative; background: var(--paper); color: var(--ink); font-family: var(--mono); font-size: 15px; padding: 24px 24px 20px; border-radius: 6px 6px 0 0; font-variant-numeric: tabular-nums; }
+  .paper::after { content: ""; position: absolute; left: 0; right: 0; bottom: -10px; height: 10px;
+    background: linear-gradient(135deg, var(--paper) 50%, transparent 50%) 0 0 / 14px 10px repeat-x,
+                linear-gradient(225deg, var(--paper) 50%, transparent 50%) 0 0 / 14px 10px repeat-x; }
+  .paper .title { text-align: center; font-weight: 700; letter-spacing: .12em; margin-bottom: 4px; }
+  .paper .sub-title { text-align: center; color: var(--ink-muted); font-size: 13px; margin-bottom: 14px; }
+  .rule { border-top: 2px dashed #c4bfb3; margin: 12px 0; }
+  .row { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; }
+  .row.indent { padding-left: 16px; } .row.indent2 { padding-left: 32px; color: var(--ink-muted); font-size: 14px; }
+  .row b { font-weight: 700; }
+  .row.total { align-items: baseline; font-weight: 700; }
+  .row.total .big { font-size: 34px; }
+  .paper .good { color: var(--ink-good); } .paper .bad { color: var(--ink-bad); }
+  .example { transform: rotate(2deg); max-width: 380px; justify-self: center; width: 100%; }
+  .example-caption { text-align: center; color: var(--muted); font-size: 14px; margin-top: 22px; transform: rotate(2deg); }
+
+  /* After a check the hero shrinks to a one-column search bar above the receipt */
+  .hero.compact { grid-template-columns: 1fr; max-width: 680px; margin: 0 auto; padding: 16px 0 32px; }
+  .hero.compact h1 { font-size: 30px; } .hero.compact .lead, .hero.compact .pill-label { display: none; }
+
+  /* Result */
+  #result { padding: 8px 0 56px; }
+  .shared { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--accent); border-radius: 12px; padding: 12px 16px; margin-bottom: 24px; }
+  #verdict { font-size: 26px; font-weight: 700; line-height: 1.25; margin: 0 0 20px; }
+  #scope, #unpriced { margin: 22px 0 0; }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin: 24px 0 0; }
+  .actions .btn { flex: 1 1 200px; }
+
+  .waitlist { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 24px; margin: 40px 0 0; }
+  .waitlist h2 { font-size: 22px; line-height: 1.3; margin: 0 0 6px; }
+  .waitlist > p { margin: 0 0 18px; }
+  .roles { display: flex; flex-wrap: wrap; gap: 8px; border: 0; padding: 0; margin: 0 0 16px; }
+  .roles legend { padding: 0; margin-bottom: 8px; font-size: 14px; color: var(--muted); }
+  .choice { position: relative; border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; cursor: pointer; font-size: 15px; }
+  .choice input { position: absolute; opacity: 0; pointer-events: none; }
+  .choice:has(input:checked) { border-color: var(--accent); background: rgba(88, 166, 255, .12); }
+  .choice:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .fields input { min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; padding: 12px; }
+  .fields input:focus { outline: none; border-color: var(--accent); }
+  .fields button { grid-column: 1 / -1; }
+  .hp { position: absolute; left: -9999px; width: 1px; height: 1px; }
+  #wl-msg { min-height: 24px; margin: 10px 0 0; } #wl-msg.err { color: var(--bad); } #wl-msg.ok { color: var(--good); }
+  .fine { font-size: 13px; color: var(--muted); margin: 6px 0 0; }
+
+  details { border-top: 1px solid var(--line); padding: 16px 0; }
+  details:last-of-type { border-bottom: 1px solid var(--line); }
+  summary { cursor: pointer; font-weight: 600; }
+  details p { color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; margin-top: 12px; }
   th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); }
   th { color: var(--muted); font-weight: 500; }
   td:not(:first-child), th:not(:first-child) { text-align: right; white-space: nowrap; }
+  td.good { color: var(--good); } td.bad { color: var(--bad); }
   .tag { font-size: 12px; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0 4px; }
-  canvas { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--line); margin: 24px 0 12px; }
-  .share { display: flex; gap: 8px; flex-wrap: wrap; }
-  .waitlist { background: var(--panel); border: 1px solid var(--accent); border-radius: 8px; padding: 4px 16px 8px; margin: 24px 0; }
-  .waitlist h2 { margin: 16px 0 4px; font-size: 20px; }
-  .roles { border: 0; padding: 0; margin: 12px 0; } .roles legend { padding: 0; margin-bottom: 4px; }
-  .roles label { display: block; padding: 4px 0; cursor: pointer; }
-  .roles input { flex: none; padding: 0; margin: 0 8px 0 0; accent-color: var(--accent); }
-  .fields { display: flex; gap: 8px; flex-wrap: wrap; } .fields input { min-width: 180px; }
-  .hp { position: absolute; left: -9999px; }
-  #wl-msg { min-height: 24px; margin: 8px 0 0; } #wl-msg.err { color: var(--bad); } #wl-msg.ok { color: var(--good); }
-  details { margin-top: 32px; color: var(--muted); }
-  footer { margin-top: 48px; font-size: 13px; color: var(--muted); }
+  #card { display: none; }
+
+  .more { padding: 0 0 24px; }
+  footer { border-top: 1px solid var(--line); padding: 24px 0 40px; font-size: 13px; color: var(--muted); }
   footer a { color: var(--muted); }
+
+  @media (max-width: 860px) {
+    .hero { grid-template-columns: 1fr; gap: 40px; padding: 24px 0 48px; }
+    h1 { font-size: 36px; }
+    .lead { font-size: 17px; }
+    .example, .example-caption { transform: none; }
+  }
+  @media (max-width: 520px) {
+    #form { flex-direction: column; }
+    .fields { grid-template-columns: 1fr; }
+    #verdict { font-size: 22px; }
+    .waitlist { padding: 20px 16px; }
+  }
 </style>
 </head>
 <body>
-<main>
-  <p class="eyebrow">For Solana liquidity providers (LPs)</p>
-  <h1>Your PnL includes the market.<br>See what liquidity earned you.</h1>
-  <p class="lead">Paste a Solana wallet. Get a receipt: what the market did, what liquidity did, and how much of your fees you kept.</p>
+<div class="wrap">
+  <header>
+    <a class="brand" href="./"><img src="img/raccoon.png" alt="" width="36" height="36">Shoulda Held?</a>
+    <a class="xlink" href="https://x.com/shouldaheld" target="_blank" rel="noopener">@shouldaheld</a>
+  </header>
 
-  <form id="form">
-    <input id="wallet" placeholder="Paste a Solana wallet address" autocomplete="off" spellcheck="false" aria-label="Solana wallet address">
-    <button id="go">Check</button>
-  </form>
-  <p class="muted small">Read-only. No wallet connection, no signatures. Supports Meteora DLMM for now. <a href="#" id="example">No wallet? Try an example →</a></p>
-  <div id="error" role="alert"></div>
-
-  <section id="intro">
-    <h2>A +$450 PnL that earned nothing</h2>
-    <p class="muted">10 SOL into a pool at $100. SOL rises to $150.</p>
-    <div class="compare">
-      <div class="card"><span class="muted">Your PnL</span><b class="good">+$450</b><span class="muted">$1,450 now vs $1,000 in</span></div>
-      <div class="card"><span class="muted">From the market</span><b>+$500</b><span class="muted">SOL went up; holding 10 SOL gives $1,500</span></div>
-      <div class="card accent"><span class="muted">From liquidity</span><b class="bad">−$50</b><span class="muted">$30 fees, −$80 from price moves</span></div>
+  <section class="hero" id="top">
+    <div>
+      <span class="pill-label">For Solana liquidity providers</span>
+      <h1>Your PnL includes the market. <span>See what liquidity earned you.</span></h1>
+      <p class="lead">Paste a wallet and get a receipt: what the market did, what liquidity did, and how much of your fees you kept.</p>
+      <form id="form">
+        <input id="wallet" placeholder="Paste a Solana wallet address" autocomplete="off" spellcheck="false" aria-label="Solana wallet address">
+        <button id="go">Get my receipt</button>
+      </form>
+      <div id="error" role="alert"></div>
+      <div class="trust"><span>Read-only, no wallet connect</span><span>Meteora DLMM</span><a href="#" id="example">See an example →</a></div>
     </div>
-    <p class="muted">Fees kept: <b class="bad">−167%</b>. Holding would have been better.</p>
+
+    <div id="intro">
+      <div class="paper example" aria-label="Example receipt">
+        <div class="title">RECEIPT</div>
+        <div class="sub-title">10 SOL in at $100 · SOL now $150</div>
+        <div class="rule"></div>
+        <div class="row"><span>Your PnL</span><b class="good">+$450</b></div>
+        <div class="row indent"><span>Market</span><span>+$500</span></div>
+        <div class="row indent"><span>Liquidity</span><b class="bad">−$50</b></div>
+        <div class="row indent2"><span>fees</span><span>+$30</span></div>
+        <div class="row indent2"><span>price moves</span><span>−$80</span></div>
+        <div class="rule"></div>
+        <div class="row total"><span>FEES KEPT</span><span class="big bad">−167%</span></div>
+      </div>
+      <p class="example-caption">A +$450 PnL where liquidity earned nothing.</p>
+    </div>
   </section>
 
-  <section id="result" hidden>
+  <section id="result" class="narrow" hidden>
     <div id="shared" class="shared" hidden>
-      <span>This is someone else's receipt.</span>
+      <span>You're looking at someone else's receipt.</span>
       <button id="check-own" type="button">Check your wallet</button>
     </div>
     <p id="verdict"></p>
+
     <div id="full">
-    <span class="muted">Fees kept</span>
-    <div id="hero" class="hero"></div>
-    <div class="receipt">
-      <div class="line"><span>Your PnL</span><b id="pnl"></b></div>
-      <div class="line sub"><span>From the market</span><b id="market"></b></div>
-      <div class="line sub"><span>From liquidity</span><b id="lp"></b></div>
-      <div class="line subsub"><span>Fees earned</span><b id="fees"></b></div>
-      <div class="line subsub"><span>Price-move cost</span><b id="cost"></b></div>
-    </div>
-    <p class="muted" id="scope"></p>
-    <p id="unpriced" class="muted" hidden></p>
-
-    <form id="waitlist" class="waitlist" novalidate>
-      <h2 id="wl-title"></h2>
-      <p class="muted" id="wl-text"></p>
-      <fieldset class="roles">
-        <legend class="muted small">I'm interested in</legend>
-        <label><input type="radio" name="role" value="copy"> Copying LPs who keep their fees</label>
-        <label><input type="radio" name="role" value="lead"> Getting paid when others copy me</label>
-        <label><input type="radio" name="role" value="curious"> Just curious</label>
-      </fieldset>
-      <div class="fields">
-        <input id="wl-email" type="email" placeholder="you@example.com" autocomplete="email" aria-label="Email">
-        <input id="wl-x" placeholder="@handle on X (optional)" autocomplete="off" aria-label="X handle">
-        <input id="wl-website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
-        <button id="wl-go">Join the waitlist</button>
+      <div class="paper">
+        <div class="title">RECEIPT</div>
+        <div class="sub-title" id="scope"></div>
+        <div class="rule"></div>
+        <div class="row"><span>Your PnL</span><b id="pnl"></b></div>
+        <div class="row indent"><span>Market</span><span id="market"></span></div>
+        <div class="row indent"><span>Liquidity</span><b id="lp"></b></div>
+        <div class="row indent2"><span>fees</span><span id="fees"></span></div>
+        <div class="row indent2"><span>price moves</span><span id="cost"></span></div>
+        <div class="rule"></div>
+        <div class="row total"><span>FEES KEPT</span><span id="hero" class="big"></span></div>
       </div>
-      <p id="wl-msg" role="status"></p>
-      <p class="muted small">Used only to tell you when copying opens. We keep your email or handle, your choice above, and this wallet's result. Delete anytime: <a href="mailto:hello@shouldaheld.com">hello@shouldaheld.com</a> · <a href="terms.html#privacy">Privacy</a></p>
-    </form>
+      <p id="unpriced" class="muted small" hidden></p>
 
-    <table>
-      <thead><tr><th>Pool</th><th>Fees kept</th><th>From liquidity</th><th>Fees</th></tr></thead>
-      <tbody id="rows"></tbody>
-    </table>
-    <p id="rows-note" class="muted"></p>
+      <div class="actions">
+        <a id="share-x" class="btn" target="_blank" rel="noopener">Share on X</a>
+        <button id="download" class="btn secondary" type="button">Download card</button>
+      </div>
 
-    <canvas id="card" width="1200" height="630" aria-label="Shareable result card"></canvas>
-    <div class="share">
-      <a id="share-x" class="btn" target="_blank" rel="noopener">Share on X</a>
-      <button id="download" class="btn secondary" type="button">Download card</button>
-    </div>
+      <form id="waitlist" class="waitlist" novalidate>
+        <h2 id="wl-title"></h2>
+        <p class="muted" id="wl-text"></p>
+        <fieldset class="roles">
+          <legend>I'm interested in</legend>
+          <label class="choice"><input type="radio" name="role" value="copy">Copying top LPs</label>
+          <label class="choice"><input type="radio" name="role" value="lead">Getting copied</label>
+          <label class="choice"><input type="radio" name="role" value="curious">Just curious</label>
+        </fieldset>
+        <div class="fields">
+          <input id="wl-email" type="email" placeholder="Email" autocomplete="email" aria-label="Email">
+          <input id="wl-x" placeholder="X handle (optional)" autocomplete="off" aria-label="X handle">
+          <input id="wl-website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+          <button id="wl-go">Join the waitlist</button>
+        </div>
+        <p id="wl-msg" role="status"></p>
+        <p class="fine">Only used to tell you when copying opens. <a href="terms.html#privacy">What we keep</a> · delete anytime via <a href="mailto:hello@shouldaheld.com">hello@shouldaheld.com</a></p>
+      </form>
+
+      <details style="margin-top: 32px">
+        <summary>Per-pool breakdown</summary>
+        <table>
+          <thead><tr><th>Pool</th><th>Fees kept</th><th>Liquidity</th><th>Fees</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <p id="rows-note" class="muted small"></p>
+      </details>
+
+      <canvas id="card" width="1200" height="630" aria-hidden="true"></canvas>
     </div>
   </section>
 
-  <details>
-    <summary>How is this calculated?</summary>
-    <p><b>Your PnL</b> is the dollar result reported by Meteora: what you have now (or got out) vs the dollar value you put in. It includes the market moving your tokens up or down.</p>
-    <p><b>From liquidity</b> compares each position with simply holding the tokens you put in: what you got back (withdrawals, plus what is still in the position if it is open) minus the tokens you deposited, plus the fees you earned. Closed positions are valued at the prices when you exited, open ones at today's prices. <b>From the market</b> is the rest of your PnL.</p>
-    <p><b>Fees kept</b> is "from liquidity" divided by fees earned. 100% means price moves cost you nothing; 0% means they ate all your fees; below 0% means providing liquidity lost money compared with holding. Shown only when fees are at least $1.</p>
-    <p>Supports Meteora DLMM for now. Covers pools where you closed a position in the last 365 days, plus pools with open positions. If a position was swapped entirely into one token, its exit price is estimated from the edge of its price range. Tokens without a current price count as $0. Read-only: we never ask you to connect a wallet.</p>
-  </details>
+  <section class="more narrow">
+    <details>
+      <summary>How is this calculated?</summary>
+      <p><b>Your PnL</b> is the dollar result reported by Meteora: what you have now (or got out) vs the dollar value you put in. It includes the market moving your tokens.</p>
+      <p><b>Liquidity</b> compares each position with simply holding the tokens you put in, plus the fees you earned. Closed positions are valued at exit prices, open ones at today's prices. <b>Market</b> is the rest of your PnL.</p>
+      <p><b>Fees kept</b> is liquidity divided by fees earned. 100%: price moves cost nothing. 0%: they ate all your fees. Below 0%: holding would have been better. Shown when fees are at least $1.</p>
+      <p>Covers Meteora DLMM pools with a position closed in the last 365 days, plus open positions. If a position was swapped entirely into one token, its exit price is estimated from its range edge. Tokens without a price count as $0.</p>
+    </details>
+  </section>
 
   <footer>
-    Data from the public Meteora API. Not financial advice. Nothing is stored on our side. Not affiliated with Meteora. <a href="https://x.com/shouldaheld" target="_blank" rel="noopener">@shouldaheld on X</a> · <a href="terms.html">Terms and privacy</a>
+    Data from the public Meteora API. Read-only and free. Not financial advice. Not affiliated with Meteora.
+    <a href="https://x.com/shouldaheld" target="_blank" rel="noopener">@shouldaheld</a> · <a href="terms.html">Terms and privacy</a>
   </footer>
-</main>
+</div>
 <script type="module" src="app.js"></script>
 </body>
 </html>
