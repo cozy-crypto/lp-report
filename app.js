@@ -96,8 +96,8 @@ function render(s, user) {
 
   const link = `${location.origin}${location.pathname}?wallet=${user}`;
   const text = s.rows.length
-    ? `My Meteora LP vs just holding: ${signed(s.vsHodl)} across ${s.rows.length} pools (fees earned: ${usd(s.feesUsd)}). What's yours?`
-    : 'Checking my honest LP results';
+    ? `My Meteora LP vs just holding: ${signed(s.vsHodl)} across ${s.rows.length} pools (fees earned: ${usd(s.feesUsd)}). ${win ? 'Not bad.' : 'Shoulda held.'} Get your receipt from @shouldaheld`
+    : 'Checking my honest LP receipt from @shouldaheld';
   $('share-x').href = `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(link)}`;
   drawCard(s);
   $('intro').hidden = true;
@@ -116,7 +116,7 @@ function drawCard(s) {
   g.fillStyle = '#e6edf3'; g.font = '400 34px system-ui, sans-serif';
   g.fillText(`${s.rows.length} pools · fees earned ${usd(s.feesUsd)} · deposited ${usd(s.depositedUsd)}`, 80, 410);
   g.fillStyle = '#8b949e'; g.font = '400 26px system-ui, sans-serif';
-  g.fillText('Closed positions at exit prices · data: Meteora', 80, 550);
+  g.fillText('@shouldaheld · closed positions at exit prices · data: Meteora', 80, 550);
 }
 
 async function run(user) {
