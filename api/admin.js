@@ -128,7 +128,7 @@ async function page(env, email) {
 <h2>Last 7 days at a glance</h2>
 <div class="cards">${[
     ['Mobile visits', rate(stats.mobile ?? 0, stats.visits)],
-    ['Checks of own wallet', rate(stats.own ?? 0, stats.checks)],
+    ['Checks of a typed-in address (not proof of ownership)', rate(stats.own ?? 0, stats.checks)],
     ['Failed checks', stats.errors ?? 0],
     ['Avg check time', stats.ms == null ? '—' : `${(stats.ms / 1000).toFixed(1)}s`],
   ].map(([k, v]) => `<div class="card"><span class="muted">${k}</span><b>${v}</b></div>`).join('')}</div>

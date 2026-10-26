@@ -12,7 +12,9 @@ export async function buildStats(env) {
          sum(type = 'visit' AND ref IS NOT NULL) AS visitsFromShares,
          sum(type = 'check' AND ${OK}) AS checks,
          count(DISTINCT CASE WHEN type = 'check' AND ${OK} THEN wallet_hash END) AS walletsChecked,
-         sum(type = 'check' AND ${OK} AND json_extract(meta, '$.own')) AS ownWalletChecks,
+         sum(type = 'check' AND ${OK} AND json_extract(meta, '$.own')) AS typedInChecks, -- address typed by the visitor, not the example or a shared link; NOT proof of ownership
+         sum(type = 'action' AND json_extract(meta, '$.name') = 'owner' AND json_extract(meta, '$.mine')) AS saidMine, -- answered "It's mine", unproven
+         sum(type = 'action' AND json_extract(meta, '$.name') = 'verified') AS verifiedOwners, -- signed with the wallet: proven
          sum(type = 'check' AND NOT ${OK}) AS failedChecks,
          sum(type = 'share') AS shares,
          count(DISTINCT CASE WHEN type = 'preview' THEN ref END) AS cardsPosted,
@@ -43,7 +45,7 @@ export async function buildStats(env) {
        FROM (SELECT wallet_hash, json_extract(meta, '$.depositedUsd') AS d FROM events
              WHERE type = 'check' AND ${OK} AND created_at >= ?1) GROUP BY bucket`, since30),
     q(`SELECT count(*) AS total, sum(role = 'copy') AS wantCopy, sum(role = 'lead') AS wantLead, sum(role = 'curious') AS curious,
-         sum(owns_wallet AND fees_kept >= 0.5 AND fees_usd >= 500) AS leaderCandidates, sum(owns_wallet >= 1) AS ownWallet, sum(owns_wallet = 2) AS verified, sum(fees_usd >= 5000 OR deposited_usd >= 50000) AS bigLps,
+         sum(owns_wallet AND fees_kept >= 0.5 AND fees_usd >= 500) AS leaderCandidates, sum(owns_wallet = 1) AS saidMineUnverified, sum(owns_wallet = 2) AS verified, sum(fees_usd >= 5000 OR deposited_usd >= 50000) AS bigLps,
          sum(referred_by IS NOT NULL) AS referred FROM waitlist`),
     q(`SELECT json_extract(meta, '$.name') AS action, count(*) AS n FROM events
        WHERE type = 'action' AND created_at >= ?1 GROUP BY action ORDER BY n DESC`, since7),
@@ -53,7 +55,9 @@ export async function buildStats(env) {
   ]);
   return {
     generatedAt: new Date().toISOString(),
-    notes: 'daily: last 30 days, newest first. sources, campaigns, shares, cards, actions: last 7 days. buckets: last 30 days, unique wallets. '
+    notes: 'Ownership has three levels, never mix them: typedInChecks = visitor typed the address themselves (not proof); '
+      + 'saidMine = answered "It\'s mine" (unproven); verifiedOwners / waitlist.verified / verifiedWallets = signed with the wallet (proven). '
+      + 'daily: last 30 days, newest first. sources, campaigns, shares, cards, actions: last 7 days. buckets: last 30 days, unique wallets. '
       + 'cardsPosted = share cards a platform fetched for a preview (the link was posted); postedOn lists where.',
     daily, sources, campaigns, shares, cards, feesKeptBuckets: kept, depositBuckets: sizes, waitlist: waitlist[0], actions, verifiedWallets: verified.n, crawls,
   };
