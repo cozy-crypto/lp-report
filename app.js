@@ -60,9 +60,10 @@ function render(s, user, b, verified) {
   mine = s; current = { s, bench, user };
   walletVerified = verified.has(user);
   // Anyone can paste any wallet, so texts stay third-person until the visitor says it's theirs.
-  // The example and a wallet opened from someone's shared card are never the visitor's.
+  // Only a wallet opened from someone's shared card is assumed not theirs (that page says so in a banner);
+  // everyone else, the example included, is asked: a strong result is pitched leading, and only the owner can say yes.
   owner = store.get(`verified:${user}`) ? true // this browser signed for it earlier
-    : user === EXAMPLE || (REF && user === params.get('wallet')) ? false : null;
+    : REF && user === params.get('wallet') ? false : null;
   guest = owner === false;
   $('verify-msg').textContent = ''; $('verify-help').hidden = true;
   $('duel-result').hidden = true;
