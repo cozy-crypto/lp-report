@@ -59,6 +59,6 @@ export async function buildStats(env) {
       + 'saidMine = answered "It\'s mine" (unproven); verifiedOwners / waitlist.verified / verifiedWallets = signed with the wallet (proven). '
       + 'daily: last 30 days, newest first. sources, campaigns, shares, cards, actions: last 7 days. buckets: last 30 days, unique wallets. '
       + 'cardsPosted = share cards a platform fetched for a preview (the link was posted); postedOn lists where.',
-    daily, sources, campaigns, shares, cards, feesKeptBuckets: kept, depositBuckets: sizes, waitlist: waitlist[0], actions, verifiedWallets: verified.n, crawls,
+    daily, sources, campaigns, shares, cards, feesKeptBuckets: kept, depositBuckets: sizes, waitlist: Object.fromEntries(Object.entries(waitlist[0]).map(([k, v]) => [k, v ?? 0])), // SQL sum() of no rows is null actions, verifiedWallets: verified.n, crawls,
   };
 }
