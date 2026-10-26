@@ -21,7 +21,7 @@ header { display: flex; align-items: center; justify-content: space-between; pad
 header nav { display: flex; gap: 20px; }
 .brand { white-space: nowrap; }
 
-.hero { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 56px; align-items: center; padding: 48px 0 72px; }
+.hero { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 56px; align-items: start; padding: 48px 0 72px; } /* top-aligned: pill and title sit at the same spot on every page */
 .pill-label { display: inline-block; font-size: 13px; color: var(--accent); border: 1px solid rgba(88, 166, 255, .4); border-radius: 999px; padding: 3px 12px; margin-bottom: 20px; }
 h1 { font-size: 52px; line-height: 1.08; letter-spacing: -0.02em; margin: 0 0 20px; }
 h1 span { color: var(--good); }
