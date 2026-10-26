@@ -10,12 +10,12 @@ let data, tab = 'fame', min = 0, verified = new Set(); // wallets whose owner pr
 
 function render() {
   const wallets = data.wallets.filter(w => w.dep >= min);
-  const kept = wallets.map(w => w.k).sort((a, b) => a - b);
+  const ks = wallets.map(w => w.k).sort((a, b) => a - b);
   const stats = [
     [wallets.length.toLocaleString('en-US'), 'LPs ranked'],
-    [pct(kept.filter(k => k < 0).length / (kept.length || 1)), 'did worse than holding'],
-    [pct(quantile(kept, 0.5)), 'fees kept by the typical LP'],
-    [`${pct(quantile(kept, 0.9))}+`, 'kept by the top 10%'],
+    [pct(ks.filter(k => k < 0).length / (ks.length || 1)), 'did worse than holding'],
+    [kept(quantile(ks, 0.5)), 'fees kept by the typical LP'],
+    [`${pct(Math.min(1, quantile(ks, 0.9)))}+`, 'kept by the top 10%'],
   ];
   $('stats').innerHTML = stats.map(([v, l]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join('');
   $('sizes').hidden = tab === 'pools';
@@ -66,6 +66,7 @@ try {
   const day = new Date(data.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   $('lead').textContent = `${data.wallets.length.toLocaleString('en-US')} liquidity providers on Meteora, ranked by the share of fees they kept after price moves over the last ${data.days} days. Updated ${day}.`;
   render();
-} catch {
-  $('note').textContent = 'The leaderboard is being built. Check back tomorrow.';
+} catch (e) {
+  console.error(e);
+  $('note').textContent = data ? "Couldn't show the leaderboard. Try reloading." : 'The leaderboard is being built. Check back tomorrow.';
 }

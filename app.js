@@ -27,8 +27,8 @@ const board = fetch('data/leaderboard.json', { cache: 'no-cache' }).then(r => (r
 
 function benchmark(s, b) {
   if (!b?.wallets.length || s.feesKept === undefined) return null;
-  const kept = b.wallets.map(w => w.k).sort((x, y) => x - y);
-  return { beat: kept.filter(k => k < s.feesKept).length / kept.length, n: kept.length, top: kept[Math.floor(0.9 * kept.length)] };
+  const ks = b.wallets.map(w => w.k).sort((x, y) => x - y);
+  return { beat: ks.filter(k => k < s.feesKept).length / ks.length, n: ks.length, top: ks[Math.floor(0.9 * ks.length)] };
 }
 
 function render(s, user, b, verified) {
