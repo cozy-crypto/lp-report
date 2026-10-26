@@ -1,5 +1,5 @@
 import { report, DAYS } from './meteora.js';
-import { usd, signed, pct, tone } from './format.js';
+import { usd, signed, pct, kept, tone } from './format.js';
 import { BACKEND, params, REF, track, action, trackVisit, referredBy, firstSource } from './analytics.js';
 
 const WALLET = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
@@ -35,7 +35,7 @@ function render(s, user, b, verified) {
   const bench = benchmark(s, b);
   const set = (id, v, cls = '') => { $(id).textContent = v; $(id).className = cls; };
   $('result').classList.toggle('empty', !s.rows.length);
-  set('hero', pct(s.feesKept), 'big ' + tone(s.feesKept ?? s.vsHodl));
+  set('hero', kept(s.feesKept), 'big ' + tone(s.feesKept ?? s.vsHodl));
   set('pnl', signed(s.pnlUsd), tone(s.pnlUsd));
   set('market', signed(s.marketUsd));
   set('lp', signed(s.vsHodl), tone(s.vsHodl));
@@ -48,10 +48,10 @@ function render(s, user, b, verified) {
   $('unpriced').hidden = !s.unpriced;
   $('unpriced').textContent = `${s.unpriced} open pool(s) hold tokens with no current price; those tokens count as $0.`;
   $('bench').hidden = !bench;
-  if (bench) $('bench').innerHTML = `Better than ${pct(bench.beat)} of ${bench.n.toLocaleString('en-US')} tracked LPs · <a href="top.html">leaderboard</a>`;
+  if (bench) $('bench').innerHTML = `${beatText(bench)} · <a href="top.html">leaderboard</a>`;
 
   const tr = r => `<tr><td>${r.name}${r.open ? ' <span class="tag">open</span>' : ''}</td>` +
-    `<td class="${tone(r.feesKept ?? r.vsHodl)}">${pct(r.feesKept)}</td><td class="${tone(r.vsHodl)}">${signed(r.vsHodl)}</td><td>${usd(r.feesUsd)}</td></tr>`;
+    `<td class="${tone(r.feesKept ?? r.vsHodl)}">${kept(r.feesKept)}</td><td class="${tone(r.vsHodl)}">${signed(r.vsHodl)}</td><td>${usd(r.feesUsd)}</td></tr>`;
   const top = s.rows.length > 10 ? [...s.rows.slice(0, 5), ...s.rows.slice(-5)] : s.rows;
   $('rows').innerHTML = top.map(tr).join('');
   $('rows-note').textContent = s.rows.length > 10 ? `Best 5 and worst 5 of ${s.rows.length} pools.` : '';
@@ -92,7 +92,7 @@ function applyOwner() {
   $('verdict').textContent = verdict(s, me);
   const rank = topShare(bench);
   cardKind = rank ? 'rank' : 'receipt';
-  const k = pct(s.feesKept), lp = signed(s.vsHodl), end = s.feesKept >= 0 ? 'Could be worse.' : 'Shoulda held.';
+  const k = kept(s.feesKept), lp = signed(s.vsHodl), end = s.feesKept >= 0 ? 'Could be worse.' : 'Shoulda held.';
   // Good results tag Meteora (they may repost wins on their pools); bad ones don't.
   shareText = me
     ? rank ? `Kept ${k} of my LP fees after price moves: top ${rank} of @MeteoraAG LPs.\n\nWhere do you rank? 🦝 via @shouldaheld`
@@ -205,6 +205,9 @@ async function verifyOwnership() {
 }
 const intent = (text, url) => `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
 // "12%" when the wallet is in the better half of ranked LPs: a brag people actually post.
+// Rounded down so "better than 100%" never shows up; ahead of every ranked LP says so in words.
+const beatText = b => (b.beat === 1 ? `Ahead of all ${b.n.toLocaleString('en-US')} tracked LPs`
+  : `Better than ${Math.floor(b.beat * 100)}% of ${b.n.toLocaleString('en-US')} tracked LPs`);
 const topShare = bench => (bench && bench.beat >= 0.5 ? `${Math.max(1, Math.round((1 - bench.beat) * 100))}%` : null);
 
 // Upload the drawn card and post its short link, so X shows the card under the post.
@@ -250,8 +253,8 @@ async function runDuel(e) {
     $('duel-verdict').textContent = win === 'tie' ? 'A tie.' : win === 'me' ? `${owner ? 'You' : me} kept more of ${owner ? 'your' : 'its'} fees.` : `${name} kept more of their fees.`;
     const ending = owner ? (win === 'me' ? 'Shoulda held? Not me.' : win === 'them' ? 'Fine. You win this one.' : 'Dead even.') : '';
     duelText = (owner
-      ? `My LP receipt vs ${name}: I kept ${pct(mine.feesKept)} of my fees after price moves, ${handle ? 'they' : 'this wallet'} kept ${pct(them.feesKept)}. ${ending}`
-      : `LP receipts, ${me} vs ${name}: ${pct(mine.feesKept)} vs ${pct(them.feesKept)} of fees kept after price moves.`)
+      ? `My LP receipt vs ${name}: I kept ${kept(mine.feesKept)} of my fees after price moves, ${handle ? 'they' : 'this wallet'} kept ${kept(them.feesKept)}. ${ending}`
+      : `LP receipts, ${me} vs ${name}: ${kept(mine.feesKept)} vs ${kept(them.feesKept)} of fees kept after price moves.`)
       + '\n\nCompare yours 🦝 via @shouldaheld';
     drawDuel(mine, them, name, win);
     $('duel-result').hidden = false;
@@ -269,14 +272,19 @@ async function runDuel(e) {
 let role = 'copy'; // what the waitlist pitch offers: owners with a good result can lead, everyone else can copy
 
 function renderWaitlist(s) {
-  const lead = owner === true && s.feesKept >= 0.5; // only an owner can be copied and paid
-  role = lead ? 'lead' : 'copy';
+  // The pitch follows the result first: a strong wallet is a would-be leader, unless the visitor says it isn't theirs.
+  const good = s.feesKept >= 0.5;
+  role = good && owner !== false ? 'lead' : 'copy';
   $('wl-title').textContent = (walletVerified && owner ? '✓ Verified LP. ' : '')
-    + (lead ? 'Get paid when others copy you' : 'Copy LPs who keep their fees');
-  $('wl-text').textContent = (lead
-    ? "We're building copy-LP: others follow your positions, you earn a share of their fees."
+    + (good && owner === true ? 'Get paid when others copy you'
+      : good && owner === null ? 'Your wallet? Get paid when others copy it'
+      : good ? 'Copy LPs like this one'
+      : 'Copy LPs who keep their fees');
+  $('wl-text').textContent = (good && owner !== false
+    ? "We're building copy-LP: others follow a top LP's positions, and the LP earns a share of their fees."
+    : good ? "We're building copy-LP: follow the positions of LPs with results like this, automatically, in your own wallet."
     : "We're building copy-LP: follow the best LPs' positions automatically, in your own wallet.")
-    + (owner === true && !walletVerified ? ' Verified wallets jump 50 places in line.' : '');
+    + (good && owner === null ? ' Verify it above to join as a leader.' : owner === true && !walletVerified ? ' Verified wallets jump 50 places in line.' : '');
   $('wl-msg').textContent = ''; $('wl-msg').className = '';
 }
 
@@ -329,7 +337,7 @@ function drawCard(s, bench) {
   g.fillText(measured ? (owner ? 'LP fees I kept after price moves' : 'LP fees this wallet kept after price moves')
     : (owner ? 'What liquidity earned me' : 'What liquidity earned this wallet'), 80, 140);
   g.fillStyle = good ? '#3fb950' : '#f85149'; g.font = '700 150px system-ui, sans-serif';
-  g.fillText(measured ? pct(s.feesKept) : signed(s.vsHodl), 80, 320);
+  g.fillText(measured ? kept(s.feesKept) : signed(s.vsHodl), 80, 320);
   g.fillStyle = '#e6edf3'; g.font = '400 34px system-ui, sans-serif';
   g.fillText(`From liquidity ${signed(s.vsHodl)} · fees ${usd(s.feesUsd)} · market ${signed(s.marketUsd)}`, 80, 410);
   if (bench) { g.fillStyle = '#58a6ff'; g.font = '600 34px system-ui, sans-serif'; g.fillText(`Better than ${pct(bench.beat)} of Meteora LPs`, 80, 470); }
@@ -353,7 +361,7 @@ function drawRank(s, bench, rank) {
   g.fillStyle = '#3fb950'; g.font = '800 150px system-ui, sans-serif';
   g.fillText(`TOP ${rank}`, 80, 310);
   g.fillStyle = '#e6edf3'; g.font = '400 36px system-ui, sans-serif';
-  g.fillText(`Kept ${pct(s.feesKept)} of ${usd(s.feesUsd)} in fees · liquidity ${signed(s.vsHodl)}`, 80, 400);
+  g.fillText(`Kept ${kept(s.feesKept)} of ${usd(s.feesUsd)} in fees · liquidity ${signed(s.vsHodl)}`, 80, 400);
   g.fillStyle = '#8b949e'; g.font = '400 26px system-ui, sans-serif';
   g.fillText('Where do you rank? shouldaheld.com · @shouldaheld', 80, 550);
   badge(g);
@@ -366,7 +374,7 @@ function drawDuel(a, b, name, win) {
   g.fillText('LP fees kept after price moves', 80, 120);
   const side = (x, label, v, won) => {
     g.fillStyle = '#8b949e'; g.font = '500 36px system-ui, sans-serif'; g.fillText(label, x, 220);
-    g.fillStyle = (v ?? 0) >= 0 ? '#3fb950' : '#f85149'; g.font = `${won ? 800 : 600} 130px system-ui, sans-serif`; g.fillText(pct(v), x, 370);
+    g.fillStyle = (v ?? 0) >= 0 ? '#3fb950' : '#f85149'; g.font = `${won ? 800 : 600} 130px system-ui, sans-serif`; g.fillText(kept(v), x, 370);
   };
   side(80, owner ? 'Me' : `${lastResult.wallet.slice(0, 4)}…${lastResult.wallet.slice(-4)}`, a.feesKept, win === 'me');
   side(640, name, b.feesKept, win === 'them');

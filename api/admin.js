@@ -1,6 +1,6 @@
 // admin.shouldaheld.com: funnel and segmented leads. Cloudflare Access sits in front and only lets
 // the allowed email through; the Worker still verifies Access's signed token and refuses without it.
-import { SITE, esc, usd, pct } from './util.js';
+import { SITE, esc, usd, pct, kept } from './util.js';
 import { buildStats } from './stats.js';
 
 // Who to talk to first. Thresholds are a first guess, tune them once real leads come in.
@@ -99,7 +99,7 @@ async function page(env, email) {
   const who = l => [l.email && esc(l.email), l.x && `<a href="https://x.com/${esc(l.x)}" target="_blank">@${esc(l.x)}</a>`].filter(Boolean).join('<br>');
   const leadRow = l => `<tr><td>${who(l)}</td><td>${esc(l.role)}</td>
     <td>${segments(l).map(s => `<span class="tag">${s}</span>`).join(' ')}</td>
-    <td>${pct(l.fees_kept)}</td><td>${l.fees_usd == null ? '—' : usd(l.fees_usd)}</td><td>${l.deposited_usd == null ? '—' : usd(l.deposited_usd)}</td>
+    <td>${kept(l.fees_kept)}</td><td>${l.fees_usd == null ? '—' : usd(l.fees_usd)}</td><td>${l.deposited_usd == null ? '—' : usd(l.deposited_usd)}</td>
     <td>${l.wallet ? `<a href="${SITE}/?wallet=${esc(l.wallet)}" target="_blank">${esc(l.wallet.slice(0, 4))}…${esc(l.wallet.slice(-4))}</a>` : '—'}</td>
     <td>${esc(l.created_at.slice(0, 10))}</td></tr>`;
 
@@ -141,7 +141,7 @@ async function page(env, email) {
 <p class="muted">Posted = X (or Telegram, Discord…) fetched the card to show a preview, so the link really went out.</p>
 <div class="wrap"><table><thead><tr><th>Card</th><th>Kind</th><th>Fees kept</th><th>Posted on</th><th>Clicks</th><th>Checks from it</th></tr></thead>
 <tbody>${farm.cards.map(c => `<tr><td><a href="https://r.shouldaheld.com/${esc(c.card)}.png" target="_blank">${esc(c.card)}</a></td><td>${esc(c.kind ?? 'receipt')}</td>
-  <td>${pct(c.feesKept)}</td><td>${esc(c.postedOn ?? '—')}</td><td>${c.clicks}</td><td>${c.checksFromCard}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">No shares yet</td></tr>'}</tbody></table></div>
+  <td>${kept(c.feesKept)}</td><td>${esc(c.postedOn ?? '—')}</td><td>${c.clicks}</td><td>${c.checksFromCard}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">No shares yet</td></tr>'}</tbody></table></div>
 
 <h2>Campaigns (utm_campaign), last 7 days</h2>
 <div class="wrap"><table><thead><tr><th>Campaign</th><th>Visits</th></tr></thead>

@@ -14,3 +14,4 @@ export async function hashWallet(wallet) {
 export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 export const usd = v => (v < 0 ? '−' : '') + '$' + Math.abs(Math.round(v ?? 0)).toLocaleString('en-US');
 export const pct = k => (k == null ? '—' : `${Math.round(k * 100)}%`);
+export const kept = k => (k == null ? '—' : k > 1 ? '100%+' : pct(k)); // see format.js on the site
