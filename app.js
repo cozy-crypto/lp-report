@@ -1,6 +1,6 @@
 import { report, DAYS } from './meteora.js';
 import { usd, signed, pct, kept, tone } from './format.js';
-import { BACKEND, params, REF, track, action, trackVisit, referredBy, firstSource } from './analytics.js';
+import { BACKEND, params, REF, track, action, trackVisit, referredBy, firstSource, internal } from './analytics.js';
 
 const WALLET = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const EXAMPLE = 'Abaqj8ivq6Uoinc9CQiiZ9GQNDB2RFSWqhpJKf9mN6Gu'; // an active public Meteora LP wallet
@@ -219,6 +219,7 @@ async function shareCard(canvas, kind, text, fallback) {
   try {
     const png = await new Promise(r => canvas.toBlob(r, 'image/png'));
     const q = new URLSearchParams({ wallet: lastResult.wallet, lp: lastResult.lpUsd, kind });
+    if (internal) q.set('internal', '1'); // the card still works, it just isn't counted as a share
     if (lastResult.feesKept !== undefined) q.set('k', lastResult.feesKept);
     const r = await fetch(`${BACKEND}/card?${q}`, { method: 'POST', body: png });
     if (r.ok) url = intent(text, (await r.json()).url);

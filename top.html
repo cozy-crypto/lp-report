@@ -5,8 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LP Leaderboard — Shoulda Held?</title>
 <meta name="description" content="Which Solana liquidity providers actually keep their fees after price moves, and which pools eat them. Updated daily from public Meteora data.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Who actually keeps their LP fees?">
+<meta property="og:description" content="Daily leaderboard of Meteora liquidity providers, ranked by the share of fees kept after price moves.">
+<meta property="og:url" content="https://shouldaheld.com/top.html">
+<meta property="og:image" content="https://shouldaheld.com/img/og-top.png">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content="@shouldaheld">
+<meta name="twitter:title" content="Who actually keeps their LP fees?">
+<meta name="twitter:description" content="Daily leaderboard of Meteora liquidity providers, ranked by the share of fees kept after price moves.">
+<meta name="twitter:image" content="https://shouldaheld.com/img/og-top.png">
 <link rel="icon" href="img/raccoon.png">
-<link rel="stylesheet" href="style.css?v=202610261204">
+<link rel="stylesheet" href="style.css?v=202610261217">
 <style>
   .board-hero { padding: 48px 0 8px; max-width: 760px; } /* same top offset and title size as the home page */
   @media (max-width: 860px) { .board-hero { padding-top: 24px; } } /* matches .hero on phones */
@@ -53,6 +63,7 @@
     <div class="tabs" role="group" aria-label="Board">
       <button type="button" data-tab="fame" aria-pressed="true">Kept the most</button>
       <button type="button" data-tab="shame" aria-pressed="false">Shoulda held</button>
+      <button type="button" data-tab="bets" aria-pressed="false">Price bets</button>
       <button type="button" data-tab="pools" aria-pressed="false">Pools</button>
     </div>
     <div class="sizes" role="group" aria-label="Deposit size" id="sizes">
@@ -73,6 +84,7 @@
     <summary>How is this ranked?</summary>
     <p>Every day we take the Meteora DLMM pools with the most fees in the last 24 hours (TVL over $100k), find the wallets with open positions there, and build each wallet's receipt for the last 365 days, the same way as on the main page.</p>
     <p><b>Fees kept</b> is what liquidity earned after price moves, divided by the fees earned. 100%: price moves cost nothing. Below 0%: holding the tokens would have done better. Wallets with less than $100 of fees, less than $1,000 deposited, or fees under 0.25% of what they put in are left out (there the ratio is mostly noise), and so are wallets in more than 300 pools (mostly bots).</p>
+    <p><b>Price bets</b> are LPs that beat holding by more than all the fees they earned (fees kept above 100%). Their position's price exposure paid off: that's a bet, not keeping fees, so they're listed apart.</p>
     <p><b>✓</b> marks wallets whose owner proved them by signing a message on this site.</p>
     <p><b>Pools</b> show, among the LPs we saw in each pool, how many beat holding and the share of fees the typical (median) LP kept. These are public on-chain positions; this is not a recommendation to copy anyone or to use any pool.</p>
   </details>
@@ -82,7 +94,7 @@
     <a href="https://x.com/shouldaheld" target="_blank" rel="noopener">@shouldaheld</a> · <a href="terms.html">Terms and privacy</a>
   </footer>
 </div>
-<script type="module" src="top.js?v=202610261204"></script>
+<script type="module" src="top.js?v=202610261217"></script>
 <!-- Cloudflare Web Analytics: cookieless page views, a second count next to our own analytics -->
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "d8321dd66836468e9685397cafad2d31"}'></script>
 </body>

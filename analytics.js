@@ -11,9 +11,12 @@ export const referredBy = store.get('referredBy');
 const source = params.get('utm_source') || (document.referrer && !document.referrer.startsWith(location.origin) && new URL(document.referrer).hostname) || 'direct';
 if (!store.get('firstSource')) store.set('firstSource', source);
 export const firstSource = store.get('firstSource') ?? source;
+// Our own devices: open the site once with ?internal=1 (undo with ?internal=0) and nothing from this browser is counted.
+if (params.get('internal')) store.set('internal', params.get('internal') === '1' ? '1' : '');
+export const internal = store.get('internal') === '1';
 
 // Sent as text/plain to skip the CORS preflight; failures are ignored.
-export const track = (type, data = {}) => fetch(`${BACKEND}/event`, {
+export const track = (type, data = {}) => internal ? Promise.resolve() : fetch(`${BACKEND}/event`, {
   method: 'POST', keepalive: true, body: JSON.stringify({ type, ref: REF, ...data }),
 }).catch(() => {});
 

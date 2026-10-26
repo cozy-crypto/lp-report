@@ -28,16 +28,21 @@ function render() {
     $('note').textContent = `Busiest pools by fees among the LPs we tracked. Pools with fewer than 5 of those LPs are left out.`;
     return;
   }
-  // Fame: best share of fees kept. Shame: most dollars lost to holding.
-  const rows = tab === 'fame' ? wallets : [...wallets].sort((a, b) => a.lp - b.lp);
+  // Fame: best share of fees kept, up to 100%. Above that liquidity beat holding by more than its fees,
+  // a price bet that paid off, so those go to their own tab by dollars. Shame: most dollars lost to holding.
+  const rows = tab === 'fame' ? wallets.filter(w => w.k <= 1)
+    : tab === 'bets' ? wallets.filter(w => w.k > 1).sort((a, b) => b.lp - a.lp)
+    : [...wallets].sort((a, b) => a.lp - b.lp);
   $('head').innerHTML = '<tr><th>#</th><th class="who">Wallet</th><th>Fees kept</th><th>Liquidity</th><th>Fees</th><th>Deposited</th><th class="pools">Main pools</th></tr>';
   $('body').innerHTML = rows.slice(0, SHOW).map((w, i) => `<tr><td>${i + 1}</td>
     <td class="who"><a class="mono" href="./?wallet=${w.w}&from=board">${short(w.w)}</a>${verified.has(w.w) ? ' <span class="badge-ok" title="Owner verified this wallet by signing">✓</span>' : ''}</td>
     <td class="${tone(w.k)}">${kept(w.k)}</td><td class="${tone(w.lp)}">${signed(w.lp)}</td><td>${usd(w.fees)}</td><td>${usd(w.dep)}</td>
     <td class="pools">${w.top.join(', ')}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">No wallets at this size yet</td></tr>';
-  $('note').textContent = tab === 'fame'
-    ? 'Liquidity = what providing liquidity added on top of simply holding the same tokens, fees included. Click a wallet for its full receipt.'
-    : 'Sorted by dollars lost to holding: these LPs earned fees, but price moves cost them more.';
+  $('note').textContent = {
+    fame: 'Liquidity = what providing liquidity added on top of simply holding the same tokens, fees included. Click a wallet for its full receipt.',
+    bets: 'Beat holding by more than all their fees: the price moved their way. Sorted by dollars gained over holding.',
+    shame: 'Sorted by dollars lost to holding: these LPs earned fees, but price moves cost them more.',
+  }[tab];
 }
 
 for (const b of document.querySelectorAll('.tabs button')) b.addEventListener('click', () => {

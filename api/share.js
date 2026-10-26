@@ -27,14 +27,16 @@ export async function saveCard(req, env, json, base) {
     && view.getUint32(16) === 1200 && view.getUint32(20) === 630;
   if (!isCard) return json({ error: 'Invalid card' }, 400);
 
-  const id = crypto.randomUUID().replace(/-/g, '').slice(0, 10);
+  const internal = q.get('internal') === '1'; // our own devices: keep the card working, don't count it
+  // Normal ids are hex; an internal card's id starts with Z, so its previews and clicks are skipped too.
+  const id = (internal ? 'Z' : '') + crypto.randomUUID().replace(/-/g, '').slice(0, internal ? 9 : 10);
   const feesKept = num(Number.parseFloat(q.get('k'))), lpUsd = num(Number.parseFloat(q.get('lp')));
   const kind = ['receipt', 'rank', 'duel'].includes(q.get('kind')) ? q.get('kind') : 'receipt';
   await env.DB.batch([
     env.DB.prepare('INSERT INTO cards (id, wallet, fees_kept, lp_usd, png, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)')
       .bind(id, wallet, feesKept, lpUsd, png, now()),
-    env.DB.prepare('INSERT INTO events (type, wallet_hash, fees_kept, ref, meta, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)')
-      .bind('share', await hashWallet(wallet), feesKept, id, JSON.stringify({ kind, country: req.cf?.country }), now()),
+    ...(internal ? [] : [env.DB.prepare('INSERT INTO events (type, wallet_hash, fees_kept, ref, meta, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)')
+      .bind('share', await hashWallet(wallet), feesKept, id, JSON.stringify({ kind, country: req.cf?.country }), now())]),
   ]);
   return json({ url: `${base}/${id}` });
 }
@@ -45,7 +47,7 @@ export async function sharePage(req, env, ctx, id, base) {
   const bot = botName(req.headers.get('User-Agent') ?? '');
   const meta = bot ? { bot } : { from: host(req.headers.get('Referer')) ?? 'direct' }; // X sends people via t.co
   meta.country = req.cf?.country;
-  ctx.waitUntil(env.DB.prepare('INSERT INTO events (type, wallet_hash, fees_kept, ref, meta, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)')
+  if (!id.startsWith('Z')) ctx.waitUntil(env.DB.prepare('INSERT INTO events (type, wallet_hash, fees_kept, ref, meta, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)')
     .bind(bot ? 'preview' : 'click', await hashWallet(card.wallet), card.fees_kept, id, JSON.stringify(meta), now()).run());
   const target = `${SITE}/?wallet=${card.wallet}&r=${id}&utm_source=share&utm_content=${id}`;
   const title = card.fees_kept == null
