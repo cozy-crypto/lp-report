@@ -146,7 +146,7 @@ Shoulda Held? (https://shouldaheld.com) — бесплатный «чек» дл
 - Пост или ветка по рубрике (п. 6), в голосе бренда (п. 7).
 - Видео-пост: сценарий клипа на 10–20 секунд — запись экрана «вставили кошелёк → чек → FEES KEPT крупно». Собирает продюсер фабрики, публикуется только в X.
 - Каждая цифра — со ссылкой на поле данных.
-- Ссылки только на shouldaheld.com и всегда с UTM: `utm_source=x&utm_campaign=<рубрика>-<YYYYMMDD>`. Для чека — `https://shouldaheld.com/?wallet=<адрес>&utm_source=x&utm_campaign=…`.
+- Ссылки только на shouldaheld.com и всегда с меткой кампании. Короткая форма: `?x=<рубрика>-<MMDD>`, например `shouldaheld.com/?x=shame-1027`; она равна `utm_source=x&utm_campaign=…`. Для чека: `shouldaheld.com/?wallet=<адрес>&x=<рубрика>-<MMDD>`.
 
 ### 5.2 Скаут блогеров (средняя модель + чтение X API)
 
@@ -220,7 +220,7 @@ Shoulda Held? (https://shouldaheld.com) — бесплатный «чек» дл
 > Paste a Solana wallet and get a receipt: what the market did, what liquidity actually earned, and how much of your fees you kept after price moves.
 >
 > Free, read-only, no wallet connect. 🦝
-> https://shouldaheld.com/?utm_source=x&utm_campaign=pinned
+> https://shouldaheld.com/?x=pin
 
 **День 1, Explainer:**
 > Most LPs we track kept 38% of the fees they earned.
@@ -228,7 +228,7 @@ Shoulda Held? (https://shouldaheld.com) — бесплатный «чек» дл
 > The other 62% went to price moves: the pool sold the token that went up and bought the one that went down.
 >
 > Your PnL won't show you that. A receipt will:
-> https://shouldaheld.com/?utm_source=x&utm_campaign=explainer-20261027
+> https://shouldaheld.com/?x=explainer-1027
 
 **День 1, Shoulda held:**
 > $4.5M deposited into Meteora pools. $60.7k in fees earned.
@@ -236,14 +236,14 @@ Shoulda Held? (https://shouldaheld.com) — бесплатный «чек» дл
 > Still $9.2k worse than just holding the same tokens.
 >
 > Fees kept: −15%. Shoulda held. 🦝
-> https://shouldaheld.com/?wallet=B9pRNbbZfqRbRVoEPsnNqXUiqmg9S85dgiYBwLgEXwU5&utm_source=x&utm_campaign=shame-20261027
+> https://shouldaheld.com/?wallet=B9pRNbbZfqRbRVoEPsnNqXUiqmg9S85dgiYBwLgEXwU5&x=shame-1027
 
 **День 1, Pool truth:**
 > BTC-SOL on Meteora: of 33 LPs we track, only 18% beat simply holding.
 >
 > Fees looked great. Price moves ate them.
 >
-> Pool-by-pool numbers: https://shouldaheld.com/top.html?utm_source=x&utm_campaign=pools-20261027
+> Pool-by-pool numbers: https://shouldaheld.com/top.html?x=pools-1027
 
 **День 2, PnL ≠ LP:**
 > This Meteora LP is down $17k.
@@ -251,7 +251,7 @@ Shoulda Held? (https://shouldaheld.com) — бесплатный «чек» дл
 > Liquidity didn't do that. It kept 98% of its fees, top of our board.
 > The market did the rest.
 >
-> Know which one hurt you: https://shouldaheld.com/?wallet=BzjmpdbWXYu1aupchK7VBcryY2rsD9VdFvHJtNiv49Mm&utm_source=x&utm_campaign=pnl-lp-20261028
+> Know which one hurt you: https://shouldaheld.com/?wallet=BzjmpdbWXYu1aupchK7VBcryY2rsD9VdFvHJtNiv49Mm&x=pnl-lp-1028
 
 ## 7. Голос бренда
 

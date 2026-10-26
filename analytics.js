@@ -8,7 +8,9 @@ const store = { get: k => { try { return localStorage.getItem(k); } catch { retu
 if (/^[a-z0-9]{6}$/.test(params.get('j') ?? '')) store.set('referredBy', params.get('j'));
 export const referredBy = store.get('referredBy');
 // First traffic source this browser came from, so a signup days later still credits the post that brought it.
-const source = params.get('utm_source') || (document.referrer && !document.referrer.startsWith(location.origin) && new URL(document.referrer).hostname) || 'direct';
+// Short form for our own posts: ?x=pin means utm_source=x, utm_campaign=pin.
+const campaign = params.get('x') || params.get('utm_campaign');
+const source = (params.get('x') && 'x') || params.get('utm_source') || (document.referrer && !document.referrer.startsWith(location.origin) && new URL(document.referrer).hostname) || 'direct';
 if (!store.get('firstSource')) store.set('firstSource', source);
 export const firstSource = store.get('firstSource') ?? source;
 // Our own devices: open the site once with ?internal=1 (undo with ?internal=0) and nothing from this browser is counted.
@@ -24,7 +26,7 @@ export const action = (name, meta = {}) => track('action', { meta: { name, page:
 
 export const trackVisit = page => track('visit', {
   meta: {
-    page, from: source, firstSource, campaign: params.get('utm_campaign'), content: params.get('utm_content'),
+    page, from: source, firstSource, campaign, content: params.get('utm_content'),
     referredBy: params.get('j'), mobile: matchMedia('(max-width: 640px)').matches, lang: navigator.language,
   },
 });
