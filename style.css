@@ -10,7 +10,6 @@
 body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
 a { color: var(--accent); }
 .wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
-.narrow { max-width: 680px; margin: 0 auto; }
 .muted { color: var(--muted); }
 .small { font-size: 14px; }
 
@@ -55,14 +54,16 @@ button:disabled { opacity: .6; cursor: wait; }
 .example-caption { text-align: center; color: var(--muted); font-size: 14px; margin-top: 22px; transform: rotate(2deg); }
 
 /* After a check the hero shrinks to a one-column search bar above the receipt */
-.hero.compact { grid-template-columns: 1fr; max-width: 680px; margin: 0 auto; padding: 16px 0 32px; }
+/* Same container width on every page and state; only the content inside changes */
+.hero.compact { grid-template-columns: 1fr; padding: 12px 0 28px; }
+.hero.compact #form, .hero.compact #error, .hero.compact .trust { max-width: 680px; }
 .hero.compact h1 { font-size: 30px; } .hero.compact .lead, .hero.compact .pill-label { display: none; }
 
 /* Result */
 
 /* Result: receipt on the left, one action panel on the right; on phones the panel goes under the receipt.
    Blocks change their content in place, they don't appear above the receipt, so nothing jumps. */
-#result { max-width: 1000px; margin: 0 auto; padding: 8px 0 48px; }
+#result { padding: 8px 0 40px; }
 .shared { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--accent); border-radius: 12px; padding: 12px 16px; margin-bottom: 20px; }
 .result-grid { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 40px; align-items: start; }
 .result-receipt { position: sticky; top: 16px; }
@@ -100,16 +101,21 @@ button:disabled { opacity: .6; cursor: wait; }
 .wl-done .place b { font-size: 32px; color: var(--accent); font-variant-numeric: tabular-nums; }
 .wl-done p { margin: 10px 0 0; }
 .fine { font-size: 12px; color: var(--muted); margin: 10px 0 0 !important; }
-.pools-details { margin-top: 40px; }
+.pools-details { margin-top: 32px; }
 #card, #duel-card { display: none; }
 /* A wallet with no positions: just the verdict and the waitlist */
 #result.empty .result-receipt, #result.empty .actions, #result.empty .duel, #result.empty .pools-details { display: none; }
-#result.empty .result-grid { grid-template-columns: 1fr; max-width: 640px; margin: 0 auto; }
+#result.empty .result-grid { grid-template-columns: 1fr; max-width: 640px; }
 
-details { border-top: 1px solid var(--line); padding: 16px 0; }
-details:last-of-type { border-bottom: 1px solid var(--line); }
-summary { cursor: pointer; font-weight: 600; }
-details p { color: var(--muted); }
+/* Fold-outs: one quiet panel each, no rules above and below */
+details.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; }
+details.panel + details.panel { margin-top: 12px; }
+summary { cursor: pointer; font-weight: 600; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+summary::-webkit-details-marker { display: none; }
+details.panel > summary::after { content: '+'; color: var(--muted); font-weight: 400; font-size: 20px; line-height: 1; }
+details.panel[open] > summary::after { content: '−'; }
+details.panel p { color: var(--muted); max-width: 46em; }
+details.panel[open] > summary { margin-bottom: 4px; }
 table { width: 100%; border-collapse: collapse; font-size: 15px; margin-top: 12px; }
 th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); }
 th { color: var(--muted); font-weight: 500; }
@@ -117,8 +123,7 @@ td:not(:first-child), th:not(:first-child) { text-align: right; white-space: now
 td.good { color: var(--good); } td.bad { color: var(--bad); }
 .tag { font-size: 12px; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0 4px; }
 
-.more { padding: 0 0 24px; }
-.more.narrow { max-width: 1000px; } /* lines up with the result above */
+.more { padding: 0 0 40px; }
 footer { border-top: 1px solid var(--line); padding: 24px 0 40px; font-size: 13px; color: var(--muted); }
 footer a { color: var(--muted); }
 

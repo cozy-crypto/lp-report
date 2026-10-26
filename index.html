@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Shoulda Held? — what liquidity actually earned you</title>
+<title>Shoulda Held? — did your LP beat just holding?</title>
 <meta name="description" content="Your PnL includes the market. See what providing liquidity on Solana actually earned you, and how much of your fees you kept.">
 <link rel="icon" href="img/raccoon.png">
 <link rel="stylesheet" href="style.css">
@@ -17,15 +17,15 @@
 
   <section class="hero" id="top">
     <div>
-      <span class="pill-label">For Solana liquidity providers</span>
-      <h1>Your PnL includes the market. <span>See what liquidity earned you.</span></h1>
-      <p class="lead">Paste a wallet and get a receipt: what the market did, what liquidity did, and how much of your fees you kept.</p>
+      <span class="pill-label">For Solana LPs · Meteora DLMM</span>
+      <h1>Did your LP beat <span>just holding?</span></h1>
+      <p class="lead">Paste a wallet. See the fees you earned and how much of them price moves took back.</p>
       <form id="form">
         <input id="wallet" placeholder="Paste a Solana wallet address" autocomplete="off" spellcheck="false" aria-label="Solana wallet address">
         <button id="go">Get my receipt</button>
       </form>
       <div id="error" role="alert"></div>
-      <div class="trust"><span>Read-only, no wallet connect</span><span>Meteora DLMM</span><a href="#" id="example">See an example →</a></div>
+      <div class="trust"><span>Free · read-only · no wallet connect</span><a href="#" id="example">See an example →</a></div>
     </div>
 
     <div id="intro">
@@ -122,7 +122,7 @@
       </div>
     </div>
 
-    <details class="pools-details">
+    <details class="panel pools-details">
       <summary>Per-pool breakdown</summary>
       <table>
         <thead><tr><th>Pool</th><th>Fees kept</th><th>Liquidity</th><th>Fees</th></tr></thead>
@@ -135,8 +135,8 @@
     <canvas id="duel-card" width="1200" height="630" aria-hidden="true"></canvas>
   </section>
 
-  <section class="more narrow">
-    <details>
+  <section class="more">
+    <details class="panel">
       <summary>How is this calculated?</summary>
       <p><b>Your PnL</b> is the dollar result reported by Meteora: what you have now (or got out) vs the dollar value you put in. It includes the market moving your tokens.</p>
       <p><b>Liquidity</b> compares each position with simply holding the tokens you put in, plus the fees you earned. Closed positions are valued at exit prices, open ones at today's prices. <b>Market</b> is the rest of your PnL.</p>
