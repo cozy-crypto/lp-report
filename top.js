@@ -32,7 +32,7 @@ function render() {
   const rows = tab === 'fame' ? wallets : [...wallets].sort((a, b) => a.lp - b.lp);
   $('head').innerHTML = '<tr><th>#</th><th class="who">Wallet</th><th>Fees kept</th><th>Liquidity</th><th>Fees</th><th>Deposited</th><th class="pools">Main pools</th></tr>';
   $('body').innerHTML = rows.slice(0, SHOW).map((w, i) => `<tr><td>${i + 1}</td>
-    <td class="who"><a class="mono" href="./?wallet=${w.w}">${short(w.w)}</a>${verified.has(w.w) ? ' <span class="badge-ok" title="Owner verified this wallet by signing">✓</span>' : ''}</td>
+    <td class="who"><a class="mono" href="./?wallet=${w.w}&from=board">${short(w.w)}</a>${verified.has(w.w) ? ' <span class="badge-ok" title="Owner verified this wallet by signing">✓</span>' : ''}</td>
     <td class="${tone(w.k)}">${kept(w.k)}</td><td class="${tone(w.lp)}">${signed(w.lp)}</td><td>${usd(w.fees)}</td><td>${usd(w.dep)}</td>
     <td class="pools">${w.top.join(', ')}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">No wallets at this size yet</td></tr>';
   $('note').textContent = tab === 'fame'

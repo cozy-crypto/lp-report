@@ -400,7 +400,9 @@ async function run(user) {
         positions: s.positions, open: s.openPositions, poolsFound: found, depositedUsd: Math.round(s.depositedUsd),
         pnlUsd: Math.round(s.pnlUsd), lpUsd: Math.round(s.vsHodl), unpriced: s.unpriced,
         lpDays: s.firstAt && Math.round(Date.now() / 864e5 - s.firstAt / 86400), ms: Date.now() - started,
-        own: user !== EXAMPLE && !(REF && user === params.get('wallet')), // typed their own wallet, not the example or a shared link
+        // typed in by the visitor: not the example, a shared card or a leaderboard row
+        own: user !== EXAMPLE && !(user === params.get('wallet') && (REF || params.get('from') === 'board')),
+        from: user === params.get('wallet') ? params.get('from') ?? (REF ? 'share' : null) : null,
       },
     });
   } catch (e) {
