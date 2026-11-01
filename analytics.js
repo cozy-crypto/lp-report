@@ -15,7 +15,9 @@ if (!store.get('firstSource')) store.set('firstSource', source);
 export const firstSource = store.get('firstSource') ?? source;
 // Our own devices: open the site once with ?internal=1 (undo with ?internal=0) and nothing from this browser is counted.
 if (params.get('internal')) store.set('internal', params.get('internal') === '1' ? '1' : '');
-export const internal = store.get('internal') === '1';
+export const internal = store.get('internal') === '1'
+  // Automated browsers (scanners, crawlers) announce themselves; they clicked every button without checking a wallet.
+  || navigator.webdriver === true;
 
 // Sent as text/plain to skip the CORS preflight; failures are ignored.
 export const track = (type, data = {}) => internal ? Promise.resolve() : fetch(`${BACKEND}/event`, {
